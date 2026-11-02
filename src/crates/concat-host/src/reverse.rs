@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! Reverse: the span a clip covers of a media file, written backwards,
 //! once.
@@ -361,7 +361,6 @@ fn segment_options() -> EncodeOptions {
         color_range: concat_media::ColorRange::Limited,
         hardware: false,
         threads: 2,
-        software_only: false,
     }
 }
 
@@ -378,7 +377,6 @@ fn copy_options() -> EncodeOptions {
         color_range: concat_media::ColorRange::Limited,
         hardware: false,
         threads: 2,
-        software_only: false,
     }
 }
 

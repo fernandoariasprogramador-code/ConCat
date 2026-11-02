@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! The monitor: the frame at the playhead, one request at a time.
 //!
@@ -250,7 +250,6 @@ impl MonitorPane {
                 && (studio.playing || studio.source.as_ref().is_some_and(|source| source.playing))
                 && quality > 0,
             color_space: studio.project().active().video.color_space,
-            canvas: studio.project().active().video.canvas,
         };
         if !studio.playing {
             self.cadence.report(studio.project().active().video.rate());

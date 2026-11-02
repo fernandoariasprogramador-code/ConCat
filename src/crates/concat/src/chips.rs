@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! The picture the cursor carries while something is dragged out of the
 //! library or a panel out of its seat.
@@ -27,9 +27,7 @@ pub fn chip_glyph(kind: ClipKind) -> &'static str {
         // lucide/type
         ClipKind::Text => "M12 4v16 M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2 M9 20h6",
         // lucide/audio-lines
-        ClipKind::Filter | ClipKind::SoundLayer => {
-            "M2 10v3 M6 6v11 M10 3v18 M14 8v7 M18 5v13 M22 10v3"
-        }
+        ClipKind::Filter => "M2 10v3 M6 6v11 M10 3v18 M14 8v7 M18 5v13 M22 10v3",
         // lucide/shapes
         ClipKind::Shape => {
             "M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z \
@@ -47,6 +45,8 @@ pub fn pane_glyph(slug: &str) -> &'static str {
             "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2Z \
                       M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"
         }
+        // lucide/chart-no-axes-column
+        "meters" => "M5 21v-6 M12 21V3 M19 21V9",
         // lucide/diamond
         "keyframes" => "M12 2.5l9.5 9.5-9.5 9.5-9.5-9.5z",
         // lucide/sliders-horizontal

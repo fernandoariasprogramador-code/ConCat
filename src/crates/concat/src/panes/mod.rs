@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! The window, one pane at a time.
 //!
@@ -16,18 +16,19 @@
 
 pub mod captions;
 pub mod export;
-pub mod glide;
 pub mod media_bin;
 pub mod monitor;
 pub mod pace;
 pub mod project;
 pub mod relink;
 pub mod settings;
-pub mod sounds;
 pub mod speech;
 pub mod start;
 pub mod timeline;
 pub mod voiceover;
+pub mod assistant;
+pub mod face_zoom;
+pub mod ai_expand;
 
 /// One thing that happened, to one pane.
 #[derive(Debug)]
@@ -54,8 +55,12 @@ pub enum Msg {
     Timeline(timeline::TimelineMsg),
     /// To the voiceover take.
     Voiceover(voiceover::VoiceoverMsg),
-    /// To the library's Audio page.
-    Sounds(sounds::SoundsMsg),
+    /// To the Gemini assistant pane.
+    Assistant(assistant::AssistantMsg),
+    /// To the interactive Face Zoom / Ken Burns dialog.
+    FaceZoom(face_zoom::FaceZoomMsg),
+    /// To the interactive AI Image Expansion dialog.
+    AiExpand(ai_expand::AiExpandMsg),
 }
 
 /// What a message says in the log: the activity trail of what the person
@@ -190,10 +195,7 @@ pub fn activity(msg: &Msg) -> Option<Activity> {
     let level = match inner.as_str() {
         "Select" | "Band" | "Zoomed" | "ZoomIn" | "ZoomOut" | "ZoomToFit" | "PageChanged"
         | "Restore" | "Reset" | "Opened" | "Closed" | "SnapToggled" | "MagneticToggled"
-        | "UpdatesFetched"
-        // Every return to the front asks what is missing; only what it
-        // finds - the dialog opening - is worth a line of its own.
-        | "Recheck" => Debug,
+        | "UpdatesFetched" => Debug,
         _ => Info,
     };
     Some(Activity {

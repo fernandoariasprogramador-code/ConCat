@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! Packages, and the catalogue that holds them.
 //!
@@ -618,6 +618,7 @@ impl Package {
             params,
             enabled: link.enabled,
             keys,
+            source_media_id: None,
         })
     }
 
@@ -1276,6 +1277,7 @@ mod tests {
             params: params.iter().map(|(k, v)| ((*k).to_owned(), *v)).collect(),
             enabled: false,
             keys: BTreeMap::new(),
+            source_media_id: None,
         };
         let mut green = link("concat.green-screen", &[("similarity", 40.0)]);
         assert!(catalogue.upgrade(&mut green));

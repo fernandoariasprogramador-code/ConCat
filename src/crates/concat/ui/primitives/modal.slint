@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 import { I18n } from "../i18n.slint";
 import { Theme } from "../theme/theme.slint";
@@ -14,15 +14,6 @@ import { Select } from "select.slint";
 // and shown by a property. Everything under it keeps existing — a modal is a
 // scrim over the app, not a replacement for it — which is why the scrim takes
 // pointer events rather than merely painting over them.
-//
-// Or, `floating`, no scrim at all: a card over the editor that the work
-// beside it carries on under, the way the voiceover panel floats - for a
-// tool that is used beside the timeline rather than instead of it, whose
-// job may run for minutes (Captions, Text to speech). Nothing behind it is
-// held back; the card goes where its header is dragged, stays wholly
-// inside the window, and keeps where it was put for as long as the window
-// is open. Its × is always there: closing it does not stop a job, which
-// keeps running and is shown again when it is opened again.
 export component Modal inherits Rectangle {
     in property <bool> open;
     in property <string> title;
@@ -48,35 +39,17 @@ export component Modal inherits Rectangle {
     in property <length> inset-bottom;
     in property <length> inset-left;
     in property <length> inset-right;
-    /// A card over a live editor rather than a sheet over a scrim; see
-    /// above. Never with `fill`: a phone keeps its sheet.
-    in property <bool> floating;
-    /// Where a floating card starts, from the window's top right corner:
-    /// under the title strip, over the inspector. Two cards are given
-    /// different homes so they do not open exactly on top of each other.
-    in property <length> home-right: 16px;
-    in property <length> home-top: 48px;
 
     callback closed();
-    /// A floating card was pressed on its header: it wants to be in front.
-    callback raised();
 
     visible: root.open;
-    // A card opened comes to the front.
-    changed open => {
-        if (root.open) {
-            root.raised();
-        }
-    }
     // Dark rather than blurred: Slint has no backdrop filter, and a scrim that
     // only dims is honest about that where a fake blur would not be.
-    background: root.floating ? Colors.transparent
-        : root.fill ? Theme.panel : Theme.overlay;
+    background: root.fill ? Theme.panel : Theme.overlay;
 
     // Declared first, so the surface and everything in it sits above and takes
     // its own presses. A click that lands here landed outside the dialog.
-    // A floating card has none: a click beside it is a click on the editor.
-    if !root.floating: TouchArea {
+    TouchArea {
         clicked => {
             if (root.dismissable) {
                 root.closed();
@@ -88,24 +61,9 @@ export component Modal inherits Rectangle {
     property <length> room-w: root.width - root.inset-left - root.inset-right;
     property <length> room-h: root.height - root.inset-top - root.inset-bottom;
 
-    // A floating card's place: its home, moved by however far its header
-    // has been dragged, and held inside the window - the drag included, so
-    // pulling it back from an edge moves it at once, and a window made
-    // smaller brings it along.
-    property <length> home-x: root.width - surface.width - root.home-right - root.inset-right;
-    property <length> home-y: root.home-top + root.inset-top;
-    property <length> dx;
-    property <length> dy;
-    property <length> min-dx: root.inset-left + 8px - root.home-x;
-    property <length> max-dx: root.width - root.inset-right - surface.width - 8px - root.home-x;
-    property <length> min-dy: root.inset-top + 8px - root.home-y;
-    property <length> max-dy: root.height - root.inset-bottom - surface.height - 8px - root.home-y;
-
     surface := Rectangle {
-        x: root.floating ? root.home-x + Math.max(root.min-dx, Math.min(root.max-dx, root.dx))
-            : root.inset-left + (root.room-w - self.width) / 2;
-        y: root.floating ? root.home-y + Math.max(root.min-dy, Math.min(root.max-dy, root.dy))
-            : root.inset-top + (root.room-h - self.height) / 2;
+        x: root.inset-left + (root.room-w - self.width) / 2;
+        y: root.inset-top + (root.room-h - self.height) / 2;
         // Filling, the room inside the bars. Otherwise never wider or taller
         // than that room less a margin: a phone held upright is narrower than
         // any sheet's width, and a sheet that runs off both edges cannot be
@@ -119,38 +77,15 @@ export component Modal inherits Rectangle {
         border-width: root.fill ? 0px : 1px;
         border-color: Theme.line-strong;
         border-radius: root.fill ? 0px : Theme.r-xl;
-        // Lifted off the editor it floats over, as the voiceover card is.
-        drop-shadow-blur: root.floating ? 24px : 0px;
-        drop-shadow-offset-y: root.floating ? 6px : 0px;
-        drop-shadow-color: root.floating ? #00000059 : Colors.transparent;
         clip: true;
 
         // Swallows presses that land on the dialog, so they do not reach the
-        // scrim underneath and dismiss it - or, floating, the lanes and the
-        // monitor under the card.
+        // scrim underneath and dismiss it.
         TouchArea { }
 
         body := VerticalLayout {
             Rectangle {
                 height: 42px;
-
-                // What drags a floating card, under the title and the ×.
-                if root.floating: TouchArea {
-                    mouse-cursor: move;
-                    pointer-event(event) => {
-                        if (event.kind == PointerEventKind.down) {
-                            root.raised();
-                        }
-                    }
-                    moved => {
-                        if (self.pressed) {
-                            root.dx = Math.max(root.min-dx, Math.min(root.max-dx,
-                                root.dx + self.mouse-x - self.pressed-x));
-                            root.dy = Math.max(root.min-dy, Math.min(root.max-dy,
-                                root.dy + self.mouse-y - self.pressed-y));
-                        }
-                    }
-                }
 
                 Rectangle {
                     x: 0;
@@ -180,9 +115,8 @@ export component Modal inherits Rectangle {
 
                     // Gone, not disabled, while a job is running: there is no
                     // safe answer to pressing it, so it should not be there to
-                    // press. A floating card's always is: closing it leaves
-                    // the job running, to be seen again when it is opened.
-                    if root.dismissable || root.floating: VerticalLayout {
+                    // press.
+                    if root.dismissable: VerticalLayout {
                         alignment: center;
                         Rectangle {
                             width: 26px;
@@ -695,10 +629,6 @@ export component Field inherits Rectangle {
     /// one control with a square seam between them.
     in property <length> radius-left: Theme.r;
     in property <length> radius-right: Theme.r;
-    /// The most characters it takes, or zero for no limit. A keystroke or
-    /// a paste that would run past it is refused whole, and what was there
-    /// stays: the expression language has no way to cut a string to fit.
-    in property <int> max-length;
 
     callback edited(text: string);
 
@@ -730,12 +660,8 @@ export component Field inherits Rectangle {
     // goes deaf to the model. This is seeded instead, and never while the
     // field has focus, so a republish mid-sentence cannot yank the caret.
     property <string> draft;
-    /// The draft as it last stood within `max-length`: what a keystroke
-    /// past it is undone to.
-    property <string> kept;
     function seed() {
         root.draft = root.value;
-        root.kept = root.value;
     }
     init => { root.seed(); }
     changed value => {
@@ -749,55 +675,25 @@ export component Field inherits Rectangle {
         clicked => { input.focus(); }
     }
 
-    // The strip the text shows through. A TextInput never scrolls by
-    // itself: a name longer than the field ran on past its right edge,
-    // and the caret walked out of sight under the clip with it (#506).
-    // The input is as wide as its text and slides inside this so the
-    // caret stays in view, as Slint's own LineEdit does it.
-    Rectangle {
+    input := TextInput {
         x: 10px;
+        y: (parent.height - self.height) / 2;
         width: parent.width - 20px;
-        clip: true;
+        // Without this the input takes the whole field's height — a child of a
+        // Rectangle fills it by default — so the centring above resolves to
+        // zero and the text draws hard against the top edge. Same fix, and the
+        // same reason, as SearchField in the inspector.
+        height: self.preferred-height;
+        text <=> root.draft;
+        input-type: root.secret ? InputType.password : InputType.text;
+        color: Theme.fg;
+        font-family: root.technical ? Theme.font-technical : Theme.font;
+        font-size: Theme.fs;
+        single-line: true;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: Theme.on-accent;
 
-        input := TextInput {
-            // Where the text would sit to keep the caret in view; clamped
-            // below so a short text stays put and a long one never leaves
-            // empty field after its end.
-            property <length> scroll;
-            x: min(0px, max(parent.width - self.width - self.text-cursor-width, self.scroll));
-            y: (parent.height - self.height) / 2;
-            width: max(parent.width - self.text-cursor-width, self.preferred-width);
-            // Without this the input takes the whole field's height — a child of a
-            // Rectangle fills it by default — so the centring above resolves to
-            // zero and the text draws hard against the top edge. Same fix, and the
-            // same reason, as SearchField in the inspector.
-            height: self.preferred-height;
-            text <=> root.draft;
-            input-type: root.secret ? InputType.password : InputType.text;
-            color: Theme.fg;
-            font-family: root.technical ? Theme.font-technical : Theme.font;
-            font-size: Theme.fs;
-            single-line: true;
-            selection-background-color: Theme.accent;
-            selection-foreground-color: Theme.on-accent;
-
-            cursor-position-changed(caret) => {
-                if caret.x + self.scroll < 0px {
-                    self.scroll = -caret.x;
-                } else if caret.x + self.scroll > parent.width - self.text-cursor-width {
-                    self.scroll = parent.width - caret.x - self.text-cursor-width;
-                }
-            }
-
-            edited => {
-                if (root.max-length > 0 && self.text.character-count > root.max-length) {
-                    root.draft = root.kept;
-                } else {
-                    root.kept = self.text;
-                    root.edited(self.text);
-                }
-            }
-        }
+        edited => { root.edited(self.text); }
     }
 
     if root.draft == "" && !input.has-focus: Text {

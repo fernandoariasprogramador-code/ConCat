@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! Text presets: a title's look, named, that the library's Text page
 //! offers as a card. Presets are data, never code: the built-in ones are
@@ -29,12 +29,6 @@
 //! strokeColor = "#000000"
 //! strokeWidth = 0.01
 //! align = "center"
-//!
-//! [[style.runs]]               # optional: some words in a look of their own,
-//! start = 0                    # counted in characters of `content`
-//! end = 3
-//! color = "#ffd400"            # and any of fontWeight, italic, underline,
-//!                              # strikethrough, fontScale, strokeColor
 //! ```
 //!
 //! The font is installed when the preset is first used, not when it is
@@ -102,9 +96,6 @@ struct PresetStyle {
     font_size: Option<f64>,
     font_weight: Option<f64>,
     italic: Option<bool>,
-    text_case: Option<concat_project::model::TextCase>,
-    underline: Option<bool>,
-    strikethrough: Option<bool>,
     color: Option<String>,
     align: Option<String>,
     opacity: Option<f64>,
@@ -119,14 +110,12 @@ struct PresetStyle {
     tracking: Option<f64>,
     max_width: Option<f64>,
     max_height: Option<f64>,
-    /// Some of the words in a look of their own; see `TextStyle::runs`.
-    runs: Option<Vec<concat_project::model::TextRun>>,
 }
 
 impl PresetStyle {
     fn over(self, name: &str) -> TextStyle {
         let base = TextStyle::default();
-        let mut style = TextStyle {
+        TextStyle {
             content: self.content.unwrap_or_else(|| name.to_owned()),
             font_family: self
                 .font_family
@@ -137,9 +126,6 @@ impl PresetStyle {
                 .unwrap_or(base.font_weight)
                 .clamp(100.0, 900.0),
             italic: self.italic.unwrap_or(false),
-            text_case: self.text_case.unwrap_or_default(),
-            underline: self.underline.unwrap_or(false),
-            strikethrough: self.strikethrough.unwrap_or(false),
             color: self.color.unwrap_or(base.color),
             align: match self.align.as_deref() {
                 Some("left") => TextAlign::Left,
@@ -167,12 +153,7 @@ impl PresetStyle {
             tracking: self.tracking.unwrap_or(0.0),
             max_width: self.max_width.unwrap_or(0.0).max(0.0),
             max_height: self.max_height.unwrap_or(0.0).max(0.0),
-            runs: self.runs.unwrap_or_default(),
-        };
-        // A hand-written run past the words, or on top of another, comes
-        // out in the shape the editor keeps them in.
-        style.tidy_runs();
-        style
+        }
     }
 }
 
@@ -405,35 +386,5 @@ mod tests {
         assert_eq!(style.content, "Red");
         assert_eq!(style.font_weight, TextStyle::default().font_weight);
         assert_eq!(file.offset_y, Some(0.3));
-        assert!(style.runs.is_empty());
-    }
-
-    /// A preset can give some of its words a look of their own, written
-    /// as a table per run; one that runs past the words is held to them.
-    #[test]
-    fn a_preset_carries_its_styled_words() {
-        let file: PresetFile = toml::from_str(
-            r##"
-            id = "t.breaking"
-            name = "Breaking"
-            [style]
-            content = "BREAKING news"
-            [[style.runs]]
-            start = 0
-            end = 8
-            color = "#ff0000"
-            fontWeight = 900
-            [[style.runs]]
-            start = 9
-            end = 99
-            italic = true
-            "##,
-        )
-        .expect("parses");
-        let style = file.style.over(&file.name);
-        assert_eq!(style.runs.len(), 2);
-        assert_eq!(style.runs[0].style.color.as_deref(), Some("#ff0000"));
-        assert_eq!(style.runs[0].style.font_weight, Some(900.0));
-        assert_eq!((style.runs[1].start, style.runs[1].end), (9, 13));
     }
 }

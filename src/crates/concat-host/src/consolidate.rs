@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! A frozen selection rendered through the normal exporter before an atomic
 //! `ConsolidateClips` edit. Source files are never rewritten.
@@ -113,7 +113,6 @@ impl Consolidation {
         let hdr = self.video.color_space.is_hdr();
         ExportRequest {
             output: output.to_string_lossy().into_owned(),
-            canvas: self.video.canvas,
             width: self.video.width,
             height: self.video.height,
             rate_num: self.video.rate_num,

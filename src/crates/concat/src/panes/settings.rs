@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! The settings sheet: the preferences, the two model lists, and the API
 //! server's switch.
@@ -13,23 +13,20 @@
 //! on disk after anything that could have changed it.
 
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use concat_host::models::SourcePreference;
 use concat_host::updates::{self, Fixed, Installed, Release, Standing, Version};
-use slint::{ModelRc, SharedString, VecModel};
+use slint::SharedString;
 
-use crate::close_window;
 use crate::host::{on_ui, spawn};
 use crate::i18n::{self, t, tf};
-use crate::keymap;
 use crate::panes::Msg;
 use crate::platform;
 use crate::prefs;
 use crate::studio::Studio;
-use crate::ui::{ModelData, SettingsData, ShortcutData};
+use crate::ui::{ModelData, SettingsData};
 
 /// Everything that can happen to the settings sheet.
 #[derive(Clone, Debug)]
@@ -40,15 +37,6 @@ pub enum SettingsMsg {
     Open,
     Close,
     PageChanged(i32),
-    /// The Shortcuts page: a row asked to hold the next key it should
-    /// be bound to. The sheet closing puts the listening down too — see
-    /// `Close` — so no key anywhere binds something the page stopped
-    /// caring about.
-    ShortcutCapture(String),
-    /// One row put back as it ships, taking its chord off whoever holds
-    /// it now, and every row put back at once.
-    ShortcutReset(String),
-    ShortcutResetAll,
     /// Show this run's log in the file manager.
     ShowLog,
     LanguageChanged(i32),
@@ -57,9 +45,6 @@ pub enum SettingsMsg {
     PlayheadStopsChanged(bool),
     /// The proxies switch: whether large files get a smaller copy to play.
     ProxiesChanged(bool),
-    /// The GPU switch: on, the window and the compositor draw on the GPU;
-    /// off, in software. Read at the next launch.
-    GpuChanged(bool),
     /// The magnetic timeline switch; the tray's button is the same fact.
     MagneticChanged(bool),
     DownloadSourceChanged(i32),
@@ -76,16 +61,6 @@ pub enum SettingsMsg {
     ModelDownload(String),
     ModelCancel(String),
     ModelRemove(String),
-    /// A failed download's way round: open the model's first source in
-    /// the browser, which the network may let through where it did not
-    /// let Concat ...
-    ModelOpenLink(String),
-    /// ... and install the file that browser saved, once it is picked.
-    ModelChooseFile(String),
-    ModelChosen {
-        id: String,
-        path: std::path::PathBuf,
-    },
     /// A download's worker reporting where it is.
     ModelProgress {
         id: String,
@@ -123,9 +98,6 @@ pub enum SettingsMsg {
 
 /// The Version page's index in the column of pages.
 const VERSION_PAGE: i32 = 6;
-/// The Shortcuts page's index, which the launch screen's Keyboard
-/// shortcuts card opens the sheet on.
-pub const SHORTCUTS_PAGE: i32 = 7;
 
 /// One downloadable model, as the settings sheet shows it.
 #[derive(Clone, Debug)]
@@ -140,9 +112,6 @@ pub struct ModelState {
     /// Megabytes fetched so far while a download runs.
     pub fetched: Option<f32>,
     pub unpacking: bool,
-    /// Why the last download failed, when it failed for a reason the row
-    /// can say and offer a way round.
-    pub failure: Option<concat_host::models::Failure>,
 }
 
 impl ModelState {
@@ -174,46 +143,7 @@ impl ModelState {
                 .into()
             },
             eta: SharedString::new(),
-            problem: self
-                .failure
-                .as_ref()
-                .map(failure_line)
-                .unwrap_or_default()
-                .into(),
-            manual: self.failure.is_some() && model_sources(&self.id).is_some(),
         }
-    }
-}
-
-/// What model `id` is called as a file and where it is downloaded from,
-/// whichever list it is on; `None` for one that cannot be installed from
-/// a single file.
-fn model_sources(id: &str) -> Option<(String, Vec<String>)> {
-    concat_speech::Transcriber::model_sources(id)
-        .or_else(|| concat_speech::Speech::model_sources(id))
-}
-
-/// A failed download, as the row under the model says it.
-fn failure_line(failure: &concat_host::models::Failure) -> String {
-    use concat_host::models::Failure;
-    use concat_host::net::Cause;
-
-    match failure {
-        Failure::NotTheFile => t("settings.notTheModelFile"),
-        Failure::Unreachable { cause, proxy } => match cause {
-            Cause::Blocked => t("settings.downloadBlocked"),
-            Cause::Offline => t("settings.downloadOffline"),
-            Cause::Dns => t("settings.downloadDns"),
-            Cause::Proxy => tf(
-                "settings.downloadProxy",
-                &[&proxy.as_deref().unwrap_or_default()],
-            ),
-            Cause::Certificate => t("settings.downloadCertificate"),
-            Cause::Reset => t("settings.downloadReset"),
-            Cause::Refused | Cause::Timeout => t("settings.downloadNoAnswer"),
-            Cause::Status(code) => tf("settings.downloadStatus", &[code]),
-            Cause::Other => t("settings.downloadFailed"),
-        },
     }
 }
 
@@ -228,11 +158,6 @@ pub fn installed(models: &[ModelState]) -> Vec<&ModelState> {
 pub struct SettingsPane {
     pub open: bool,
     pub tab: i32,
-    /// The Shortcuts page's row listening for its next key: the action
-    /// that key will bind to. None when none is — and when the sheet
-    /// closes under a listening row, so a key pressed in the editor
-    /// afterwards dispatches rather than binding.
-    pub capturing: Option<String>,
     pub language: usize,
     /// The switch that keeps the playhead inside the content.
     pub playhead_stops: bool,
@@ -296,13 +221,7 @@ impl SettingsPane {
                 self.refresh(studio);
                 self.open = true;
             }
-            SettingsMsg::Close => {
-                // A row left listening when the sheet goes would take
-                // the next key anywhere in the window; it is put down
-                // with the sheet.
-                self.capturing = None;
-                self.open = false;
-            }
+            SettingsMsg::Close => self.open = false,
             SettingsMsg::PageChanged(index) => {
                 self.tab = index;
                 // The Version page looks for the releases the first time it
@@ -311,22 +230,6 @@ impl SettingsPane {
                 if index == VERSION_PAGE && !self.checked {
                     self.check_updates();
                 }
-            }
-            SettingsMsg::ShortcutCapture(id) => self.capturing = Some(id),
-            SettingsMsg::ShortcutReset(id) => {
-                self.capturing = None;
-                let lost = keymap::reset(&mut studio.prefs, &id);
-                studio.prefs.save(&studio.host.dirs);
-                // The shipped chord came back off whoever was holding
-                // it, and that row now has no key until it is reset.
-                if let Some(lost) = lost {
-                    studio.notify(&tf("shortcuts.unboundNow", &[&keymap::name(lost)]), false);
-                }
-            }
-            SettingsMsg::ShortcutResetAll => {
-                self.capturing = None;
-                keymap::reset_all(&mut studio.prefs);
-                studio.prefs.save(&studio.host.dirs);
             }
             SettingsMsg::ShowLog => {
                 // The file this run is writing, when there is one, so the
@@ -377,14 +280,8 @@ impl SettingsPane {
                 // straight away (refresh_art's stamp holds the switch);
                 // off, playback reads the files from the next frame.
             }
-            SettingsMsg::GpuChanged(on) => {
-                studio.prefs.software_gpu = !on;
-                studio.prefs.software_after_crash = None;
-                studio.prefs.save(&studio.host.dirs);
-                studio.notify(&t("settings.gpuNextStart"), false);
-            }
             SettingsMsg::MagneticChanged(on) => {
-                studio.prefs.set_magnetic(on);
+                studio.prefs.magnetic = on;
                 studio.prefs.save(&studio.host.dirs);
             }
             SettingsMsg::DownloadSourceChanged(index) => {
@@ -438,33 +335,6 @@ impl SettingsPane {
                 self.refresh(studio);
             }
             SettingsMsg::ModelDownload(id) => self.download(&id, studio),
-            SettingsMsg::ModelOpenLink(id) => {
-                if let Some(url) = model_sources(&id).and_then(|(_, urls)| urls.into_iter().next())
-                    && let Err(error) = platform::open_link(&url)
-                {
-                    studio.notify(&error, true);
-                }
-            }
-            SettingsMsg::ModelChooseFile(id) => {
-                crate::host::pick_files_then(
-                    t("settings.chooseModelFile"),
-                    None,
-                    move |studio, _, _, paths| {
-                        if let Some(path) = paths.into_iter().next() {
-                            studio.handle(Msg::Settings(SettingsMsg::ModelChosen { id, path }));
-                        }
-                    },
-                );
-            }
-            // The file goes the way a download does - into the model's
-            // partial, checked against the digest, unpacked if it is an
-            // archive - so a wrong file is refused the same way.
-            SettingsMsg::ModelChosen { id, path } => {
-                if let Some((file, _)) = model_sources(&id) {
-                    concat_host::models::supply(&file, path);
-                    self.download(&id, studio);
-                }
-            }
             SettingsMsg::ModelCancel(id) => {
                 if self.is_transcriber(&id) {
                     studio.host.transcriber.cancel_download();
@@ -498,16 +368,9 @@ impl SettingsPane {
                 }
             }
             SettingsMsg::ModelFinished { id, result } => {
-                // The host's account of a failed fetch, when it was the
-                // network or the file and not a cancel or the disk.
-                let failure = result.as_ref().err().and_then(|_| {
-                    model_sources(&id)
-                        .and_then(|(file, _)| concat_host::models::last_failure(&file))
-                });
                 if let Some(model) = self.model_mut(&id) {
                     model.fetched = None;
                     model.unpacking = false;
-                    model.failure = failure.clone();
                 }
                 match result {
                     Ok(()) => {
@@ -519,10 +382,7 @@ impl SettingsPane {
                         }
                         studio.prefs.save(&studio.host.dirs);
                     }
-                    Err(error) => match &failure {
-                        Some(failure) => studio.notify(&failure_line(failure), true),
-                        None => studio.notify(&error, true),
-                    },
+                    Err(error) => studio.notify(&error, true),
                 }
                 self.refresh(studio);
             }
@@ -566,19 +426,15 @@ impl SettingsPane {
                     Ok(Installed::InstallerRunning) => {
                         log::info!("update: the installer for {version} is running; closing");
                         studio.notify(&tf("settings.installerOpened", &[&version]), false);
-                        quit_for_switch(|| {});
+                        quit_for_switch();
                     }
                     Ok(Installed::Replaced) => {
-                        // The bundle on disk is already the new build; what
-                        // is left is to start it, and that waits on the
-                        // project being saved.
                         log::info!("update: {version} is in place; starting it");
+                        if let Err(error) = updates::relaunch() {
+                            log::warn!("update: could not arrange the start: {error}");
+                        }
                         studio.notify(&tf("settings.versionInstalled", &[&version]), false);
-                        quit_for_switch(|| {
-                            if let Err(error) = updates::relaunch() {
-                                log::warn!("update: could not arrange the start: {error}");
-                            }
-                        });
+                        quit_for_switch();
                     }
                     Ok(Installed::Opened) => {
                         studio.notify(&tf("settings.packageOpened", &[&version]), false);
@@ -707,25 +563,14 @@ impl SettingsPane {
     /// takes effect; a bind that fails turns the switch back off and says
     /// why on the page.
     fn apply_server(&mut self, studio: &mut Studio) {
-        // Detached: the address is free again when this returns, and a
-        // call or an export the old server was in the middle of is
-        // cancelled and finished off the event loop, not waited for on it.
         if let Some(server) = studio.host.server.take() {
-            server.stop_detached();
+            server.stop();
         }
         self.server_error.clear();
         let exporter = studio.host.exporter.clone();
         let open_projects = studio.host.open_projects.clone();
-        let dirs = studio.host.dirs.clone();
         let prefs = &studio.prefs.server;
         if !prefs.enabled {
-            return;
-        }
-        // A token being typed is weak until it is long enough; the switch
-        // stays on and the server waits for it, rather than the switch
-        // flipping off at the first keystroke.
-        if !prefs.token.is_empty() && concat_server::check_token(&prefs.token).is_err() {
-            self.server_error = tf("settings.tokenTooWeak", &[&concat_server::MIN_TOKEN_CHARS]);
             return;
         }
         let started = prefs
@@ -737,9 +582,6 @@ impl SettingsPane {
                 let config = concat_server::Config {
                     json: Some(address),
                     token: Some(prefs.token.clone()).filter(|token| !token.is_empty()),
-                    // Where `concat --mcp`, started by an agent, finds this
-                    // server rather than opening projects behind its back.
-                    discovery: Some(concat_server::discovery::path_in(&dirs.config)),
                     ..concat_server::Config::default()
                 };
                 // The window's export slot and its register of open
@@ -792,12 +634,6 @@ impl SettingsPane {
             .filter(|model| model.fetched.is_some())
             .map(|model| (model.id.clone(), (model.fetched, model.unpacking)))
             .collect();
-        let failed: HashMap<String, concat_host::models::Failure> = self
-            .transcribers
-            .iter()
-            .chain(self.voices.iter())
-            .filter_map(|model| Some((model.id.clone(), model.failure.clone()?)))
-            .collect();
         let chosen_transcriber = studio.prefs.transcriber_model.clone();
         let chosen_voice = studio.prefs.tts_model.clone();
         if let Ok(status) = concat_speech::Transcriber::status(dirs) {
@@ -823,7 +659,6 @@ impl SettingsPane {
                         active: chosen_transcriber.as_deref() == Some(model.id.as_str()),
                         fetched,
                         unpacking,
-                        failure: failed.get(&model.id).cloned(),
                     }
                 })
                 .collect();
@@ -846,7 +681,6 @@ impl SettingsPane {
                         active: chosen_voice.as_deref() == Some(model.id.as_str()),
                         fetched,
                         unpacking,
-                        failure: failed.get(&model.id).cloned(),
                     }
                 })
                 .collect();
@@ -883,7 +717,6 @@ impl SettingsPane {
             return;
         }
         model.fetched = Some(0.0);
-        model.failure = None;
         let id = id.to_owned();
         let dirs = studio.host.dirs.clone();
         let whisper = Arc::clone(&studio.host.transcriber);
@@ -927,24 +760,6 @@ impl SettingsPane {
         SettingsData {
             open: self.open,
             tab: self.tab,
-            // The keymap's rows as the page draws them: the chord each
-            // action is on now, and whether that moved from the one it
-            // ships on — which is the row's cue to offer its reset.
-            shortcuts: ModelRc::from(Rc::new(VecModel::from(
-                keymap::ACTIONS
-                    .iter()
-                    .map(|action| ShortcutData {
-                        id: action.id.into(),
-                        label: keymap::name(action.id).into(),
-                        keys: keymap::bound(&studio.prefs, action.id)
-                            .map(keymap::display)
-                            .unwrap_or_default()
-                            .into(),
-                        custom: studio.prefs.keybinds.contains_key(action.id),
-                    })
-                    .collect::<Vec<_>>(),
-            ))),
-            capturing: self.capturing.clone().unwrap_or_default().into(),
             language: self.language as i32,
             log_level: LOG_LEVELS
                 .iter()
@@ -952,9 +767,7 @@ impl SettingsPane {
                 .unwrap_or(2) as i32,
             playhead_stops: self.playhead_stops,
             proxies: studio.prefs.proxies,
-            gpu: !studio.prefs.draws_in_software(),
-            gpu_switchable: cfg!(any(windows, target_os = "linux")),
-            magnetic: studio.prefs.magnetic(),
+            magnetic: studio.prefs.magnetic,
             download_source: self.download_source as i32,
             download_base: self.download_base.as_str().into(),
             server_enabled: studio.prefs.server.enabled,
@@ -967,12 +780,6 @@ impl SettingsPane {
                 _ => studio.prefs.server.token.as_str().into(),
             },
             server_status: self.server_status(studio).into(),
-            server_state: match &studio.host.server {
-                Some(_) => 1,
-                None if !self.server_error.is_empty() => 2,
-                None => 0,
-            },
-            server_local: is_loopback(&split_listen(&studio.prefs.server.listen).0),
             disk: {
                 let on_disk: Vec<&ModelState> = installed(&self.transcribers)
                     .into_iter()
@@ -1031,32 +838,15 @@ fn fixed_note(why: Fixed) -> String {
     }
 }
 
-/// Saves and closes the project, then quits - running `after`, the start of
-/// a build already replaced on disk, only once the project has been written.
-///
-/// A switch is only worth making if the save lands first. The relaunch of a
-/// replaced build used to be scheduled before the save, so a save that then
-/// failed started the new build over a window that still held the old
-/// session. Now a failed save starts nothing and quits nothing: the window
-/// stays up with `close_project`'s reason, and the bundle already on disk
-/// can be started by hand.
-fn quit_for_switch(after: impl FnOnce() + Send + 'static) {
-    on_ui(move |studio, app, models| {
+/// Closes the app on the event loop's next turn, the way File › Close
+/// Window does, so an installer can replace its files or the build put in
+/// place can start.
+fn quit_for_switch() {
+    on_ui(|studio, app, _| {
         log::info!("close: quitting for a version switch");
-        let outcome = close_window(
-            || studio.close_project(),
-            || {
-                after();
-                slint::ComponentHandle::window(app).hide().ok();
-                slint::quit_event_loop().ok();
-            },
-        );
-        if let Err(error) = outcome {
-            log::warn!("close: not switching, project could not be saved: {error}");
-            studio.offer_quit_without_saving(error);
-            studio.refresh_art();
-            studio.publish(app, models);
-        }
+        studio.close_project();
+        slint::ComponentHandle::window(app).hide().ok();
+        slint::quit_event_loop().ok();
     });
 }
 
@@ -1074,12 +864,6 @@ const LOG_LEVELS: [log::LevelFilter; 5] = [
 ];
 
 pub fn new_token() -> String {
-    // The server's own minting, from the operating system's randomness.
-    // The hasher's seed below is the fallback for a platform where that
-    // fails, which none the app ships on does.
-    if let Ok(token) = concat_server::mint_token() {
-        return token;
-    }
     use std::hash::{BuildHasher, Hasher};
     let word = |salt: u64| {
         let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
@@ -1114,52 +898,11 @@ mod tests {
             active: true,
             fetched: Some(50.0),
             unpacking: false,
-            failure: None,
         };
         let row = model.row();
         assert!(row.downloading);
         assert!(!row.active, "a model that is not installed is not active");
         assert!((row.progress - 0.25).abs() < 1e-6);
-        assert!(row.problem.is_empty() && !row.manual);
-    }
-
-    #[test]
-    fn a_failed_download_says_why_and_offers_the_way_round() {
-        use concat_host::models::Failure;
-        use concat_host::net::Cause;
-
-        let failed = |id: &str, failure| ModelState {
-            id: id.into(),
-            name: id.into(),
-            note: String::new(),
-            megabytes: 75.0,
-            accuracy: 2,
-            installed: false,
-            active: false,
-            fetched: None,
-            unpacking: false,
-            failure: Some(failure),
-        };
-        let blocked = Failure::Unreachable {
-            cause: Cause::Blocked,
-            proxy: None,
-        };
-        let row = failed("tiny", blocked.clone()).row();
-        assert_eq!(row.problem.as_str(), t("settings.downloadBlocked"));
-        assert!(row.manual, "a whisper model is one file, so it can be chosen");
-        let row = failed("no-such-model", blocked).row();
-        assert!(!row.problem.is_empty());
-        assert!(!row.manual, "nothing to download it from, nothing to choose");
-        let proxy = Failure::Unreachable {
-            cause: Cause::Proxy,
-            proxy: Some("127.0.0.1:7890".into()),
-        };
-        assert!(failure_line(&proxy).contains("127.0.0.1:7890"));
-        assert!(failure_line(&Failure::Unreachable {
-            cause: Cause::Status(404),
-            proxy: None
-        })
-        .contains("404"));
     }
 
     #[test]
@@ -1174,7 +917,6 @@ mod tests {
             active: false,
             fetched: None,
             unpacking: false,
-            failure: None,
         };
         let list = [model("a", true), model("b", false), model("c", true)];
         let ids: Vec<&str> = installed(&list).iter().map(|m| m.id.as_str()).collect();
@@ -1188,17 +930,6 @@ mod tests {
 /// A bracketed IPv6 host keeps its brackets. An address with no port, or
 /// a port that is not a number, gets the default port; an empty host gets
 /// loopback.
-/// Whether a listening host is this computer's alone: a loopback address
-/// or "localhost". Anything else - 0.0.0.0, a LAN address, a name - can
-/// be reached from the network, and the Automation page says so.
-pub fn is_loopback(host: &str) -> bool {
-    let host = host.trim().trim_start_matches('[').trim_end_matches(']');
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|address| address.is_loopback())
-}
-
 pub fn split_listen(listen: &str) -> (String, u16) {
     let (default_host, default_port) = match split_once_port(prefs::DEFAULT_LISTEN) {
         Some((host, Some(port))) => (host, port),
@@ -1275,24 +1006,6 @@ mod listen_tests {
         for listen in ["127.0.0.1:7420", "[::1]:7420", "0.0.0.0:65535"] {
             let (host, port) = split_listen(listen);
             assert_eq!(join_listen(&host, port), listen);
-        }
-    }
-
-    /// The Automation page warns for any host past this computer.
-    #[test]
-    fn only_a_loopback_host_is_this_computer_alone() {
-        for host in [
-            "127.0.0.1",
-            "127.0.0.2",
-            "[::1]",
-            "::1",
-            "localhost",
-            " LocalHost ",
-        ] {
-            assert!(is_loopback(host), "{host}");
-        }
-        for host in ["0.0.0.0", "192.168.1.9", "[::]", "example.com", ""] {
-            assert!(!is_loopback(host), "{host}");
         }
     }
 

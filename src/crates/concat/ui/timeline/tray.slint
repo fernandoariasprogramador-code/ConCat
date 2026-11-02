@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 import { I18n } from "../i18n.slint";
 import { Theme } from "../theme/theme.slint";
@@ -7,7 +7,6 @@ import { Glyph, Icon } from "../icons.slint";
 import { IconButton } from "../primitives/panel.slint";
 import { LevelMeter } from "../primitives/level-meter.slint";
 import { TimelineTool } from "model.slint";
-import { Editor } from "../editor.slint";
 
 // The timeline's tool tray.
 //
@@ -156,7 +155,6 @@ export component TimelineTray inherits Rectangle {
     in property <TimelineTool> tool: TimelineTool.select;
     in property <bool> snap: true;
     in property <bool> magnetic: false;
-    in property <bool> linkage: true;
     in property <bool> pan-mode: false;
     /// Trim follow: the playhead rides a clip edge while it is dragged.
     in property <bool> trim-follow: false;
@@ -185,13 +183,10 @@ export component TimelineTray inherits Rectangle {
     /// with the take's level beside it.
     in property <bool> recording;
     in property <float> record-level;
-    /// The VU meters at the lanes' right edge are shown.
-    in property <bool> meters-shown: true;
 
     callback tool-changed(tool: TimelineTool);
     callback snap-changed(snap: bool);
     callback magnetic-changed(on: bool);
-    callback linkage-changed(on: bool);
     callback pan-changed(on: bool);
     callback trim-follow-changed(on: bool);
     callback preview-axis-changed(on: bool);
@@ -214,7 +209,6 @@ export component TimelineTray inherits Rectangle {
     callback add-track(bottom: bool);
     callback fit();
     callback zoom(factor: float);
-    callback meters-shown-changed(on: bool);
 
     height: 40px;
     background: Theme.panel;
@@ -242,14 +236,14 @@ export component TimelineTray inherits Rectangle {
 
         TrayButton {
             glyph: Glyph.undo;
-            label: I18n.t1("tray.undo", Editor.keys-undo);
+            label: I18n.t1("tray.undo", @keys(Control + Z).to-string());
             icon-size: 16px;
             enabled: root.can-undo;
             clicked => { root.undo(); }
         }
         TrayButton {
             glyph: Glyph.redo;
-            label: I18n.t1("tray.redo", Editor.keys-redo);
+            label: I18n.t1("tray.redo", @keys(Control + Shift + Z).to-string());
             icon-size: 16px;
             enabled: root.can-redo;
             clicked => { root.redo(); }
@@ -262,40 +256,22 @@ export component TimelineTray inherits Rectangle {
         // already where you were looking.
         TrayButton {
             glyph: Glyph.split;
-            label: I18n.t1("tray.splitAtPlayhead", Editor.keys-split);
+            label: I18n.t1("tray.splitAtPlayhead", @keys(Control + B).to-string());
             icon-size: 16px;
             clicked => { root.split(); }
         }
         // And the razor, a tool rather than a verb: on, a click on a clip
-        // cuts it where the pointer is. Its key turns it on and off.
+        // cuts it where the pointer is. B turns it on and off.
         // https://github.com/jub0t/Concat/issues/241
         TrayButton {
             glyph: Glyph.razor;
-            label: I18n.t1("tray.splitTool", Editor.keys-split-tool);
+            label: I18n.t("tray.splitTool");
             icon-size: 16px;
             checked: root.tool == TimelineTool.split;
             clicked => {
                 root.tool-changed(root.tool == TimelineTool.split
                     ? TimelineTool.select : TimelineTool.split);
             }
-        }
-        // Delete left and Delete right, as in CapCut's toolbar: the clip under
-        // the playhead loses what is left, or right, of it. The same action
-        // as their keys (Q and W unless rebound), so a button and its key
-        // cannot disagree. https://github.com/jub0t/Concat/issues/400
-        TrayButton {
-            glyph: Glyph.delete-left;
-            label: I18n.t("shortcuts.deleteLeft") + (Editor.keys-delete-left == "" ? ""
-                : " (" + Editor.keys-delete-left + ")");
-            icon-size: 16px;
-            clicked => { Editor.shortcut("delete-left"); }
-        }
-        TrayButton {
-            glyph: Glyph.delete-right;
-            label: I18n.t("shortcuts.deleteRight") + (Editor.keys-delete-right == "" ? ""
-                : " (" + Editor.keys-delete-right + ")");
-            icon-size: 16px;
-            clicked => { Editor.shortcut("delete-right"); }
         }
         TrayButton {
             glyph: Glyph.merge;
@@ -358,7 +334,7 @@ export component TimelineTray inherits Rectangle {
 
         TrayButton {
             glyph: Glyph.hand;
-            label: I18n.t1("tray.panTool", Editor.keys-pan);
+            label: I18n.t("tray.panTool");
             icon-size: 16px;
             checked: root.pan-mode;
             clicked => { root.pan-changed(!root.pan-mode); }
@@ -392,16 +368,6 @@ export component TimelineTray inherits Rectangle {
             checked: root.magnetic;
             clicked => { root.magnetic-changed(!root.magnetic); }
         }
-        // Linkage, beside the magnetic timeline it keeps in step: when the
-        // main lane closes up or opens, the captions, titles, overlays and
-        // sounds placed against it move with it.
-        TrayButton {
-            glyph: Glyph.link;
-            label: I18n.t("tray.linkage");
-            icon-size: 16px;
-            checked: root.linkage;
-            clicked => { root.linkage-changed(!root.linkage); }
-        }
 
         Divider { }
 
@@ -409,15 +375,12 @@ export component TimelineTray inherits Rectangle {
             glyph: Glyph.text-mark;
             label: I18n.t("tray.generateCaptions");
             icon-size: 16px;
-            // On while the panel is up; a second press puts it away.
-            checked: Editor.captions-open;
             clicked => { root.captions(); }
         }
         TrayButton {
             glyph: Glyph.volume;
             label: I18n.t("tray.textToSpeech");
             icon-size: 16px;
-            checked: Editor.speech-open;
             clicked => { root.speak(); }
         }
         // A voiceover: the picture rolls from the playhead and the words go
@@ -427,7 +390,6 @@ export component TimelineTray inherits Rectangle {
             label: root.recording ? I18n.t("tray.stopRecording") : I18n.t("tray.recordVoiceover");
             icon-size: 16px;
             idle: root.recording ? Theme.danger : Theme.fg;
-            checked: Editor.voiceover-open && !root.recording;
             clicked => { root.record-voiceover(); }
         }
         if root.recording: LevelMeter {
@@ -453,8 +415,8 @@ export component TimelineTray inherits Rectangle {
             TrayButton {
                 glyph: Glyph.axis;
                 label: root.preview-axis
-                    ? I18n.t1("tray.turnOffPreviewAxis", Editor.keys-preview-axis)
-                    : I18n.t1("tray.turnOnPreviewAxis", Editor.keys-preview-axis);
+                    ? I18n.t("tray.turnOffPreviewAxis")
+                    : I18n.t("tray.turnOnPreviewAxis");
                 icon-size: 16px;
                 checked: root.preview-axis;
                 clicked => { root.preview-axis-changed(!root.preview-axis); }
@@ -489,18 +451,6 @@ export component TimelineTray inherits Rectangle {
             label: I18n.t("common.zoomIn");
             icon-size: 14px;
             clicked => { root.zoom(1 / 1.4); }
-        }
-
-        Divider { }
-
-        // The VU meters, shown or put away. Last on the row, so it sits
-        // over the column it switches.
-        TrayButton {
-            glyph: Glyph.meter;
-            label: root.meters-shown ? I18n.t("tray.hideMeters") : I18n.t("tray.showMeters");
-            icon-size: 16px;
-            checked: root.meters-shown;
-            clicked => { root.meters-shown-changed(!root.meters-shown); }
         }
     }
 }

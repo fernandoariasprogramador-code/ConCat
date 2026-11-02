@@ -1,0 +1,585 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
+
+import { I18n } from "../i18n.slint";
+import { Theme } from "../theme/theme.slint";
+import { Glyph, Icon } from "../icons.slint";
+import { Button, DialogRow, DialogSection, Modal } from "../primitives/modal.slint";
+
+export struct AiExpandData {
+    open: bool,
+    clip-id: string,
+    clip-name: string,
+    photo: image,
+    has-photo: bool,
+    photo-width: float,
+    photo-height: float,
+    preview-photo: image,
+    has-preview: bool,
+    busy: bool,
+    status-text: string,
+    prompt: string,
+    has-applied: bool,
+    fill-mode: int,
+    feather-level: int,
+}
+
+export component AiExpandDialog inherits Modal {
+    in property <AiExpandData> data;
+
+    callback dismissed();
+    callback prompt-changed(string);
+    callback generate();
+    callback restore-original();
+    callback fill-mode-changed(int);
+    callback feather-changed(int);
+
+    open: root.data.open;
+    title: "Expansión y Relleno de Foto (16:9 Panorámico)";
+    glyph: Glyph.sparkle;
+    surface-width: 680px;
+
+    closed => { root.dismissed(); }
+
+    property <float> shimmer: root.data.busy ? 1.0 : 0.0;
+    animate shimmer { duration: 1.2s; easing: ease-in-out; iteration-count: -1; }
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 14px;
+
+        // ── 1. Visor de expansión 16:9 ──
+        DialogSection {
+            first: true;
+            title: "1. Encuadre Panorámico 16:9";
+
+            canvas := Rectangle {
+                height: 215px;
+                background: Theme.well;
+                border-radius: Theme.r-lg;
+                border-width: 1px;
+                border-color: Theme.line-strong;
+                clip: true;
+
+                // Si ya se generó la vista previa expandida
+                if root.data.has-preview: Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.data.preview-photo;
+                    image-fit: contain;
+                }
+
+                // Si se está mostrando la foto vertical original y los laterales a rellenar
+                if !root.data.has-preview && root.data.has-photo: HorizontalLayout {
+                    alignment: center;
+                    spacing: 0px;
+
+                    // Lateral izquierdo generado
+                    left-fill := Rectangle {
+                        horizontal-stretch: 1;
+                        height: parent.height;
+                        background: Theme.field.darker(0.3);
+
+                        // Divisor lateral
+                        Rectangle {
+                            x: parent.width - 1px;
+                            y: 0;
+                            width: 1px;
+                            height: parent.height;
+                            background: Theme.accent.transparentize(0.5);
+                        }
+
+                        // Efecto de malla / shimmer IA
+                        Rectangle {
+                            width: parent.width;
+                            height: parent.height;
+                            background: @linear-gradient(90deg,
+                                Theme.accent.transparentize(0.92) 0%,
+                                Theme.accent.transparentize(0.75) 50%,
+                                Theme.accent.transparentize(0.92) 100%);
+                            opacity: 0.6 + 0.4 * root.shimmer;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            HorizontalLayout {
+                                alignment: center;
+                                Icon {
+                                    glyph: Glyph.sparkle;
+                                    size: 14px;
+                                    tint: Theme.accent;
+                                }
+                            }
+                            Text {
+                                text: root.data.fill-mode == 0 ? "Desenfoque Bokeh" : (root.data.fill-mode == 1 ? "Reflejo Espejado" : "Extensión IA");
+                                color: Theme.accent;
+                                font-size: Theme.fs-xs;
+                                font-weight: Theme.weight-title;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Foto vertical central intacta
+                    center-photo := Rectangle {
+                        width: Math.min(parent.width * 0.48, (root.data.photo-width > 0 && root.data.photo-height > 0) ? (parent.height * root.data.photo-width / root.data.photo-height) : parent.width * 0.45);
+                        height: parent.height;
+                        background: Colors.black;
+
+                        Image {
+                            width: parent.width;
+                            height: parent.height;
+                            source: root.data.photo;
+                            image-fit: contain;
+                        }
+
+                        // Borde de referencia vertical
+                        Rectangle {
+                            border-width: 1px;
+                            border-color: Theme.accent.transparentize(0.4);
+                        }
+                    }
+
+                    // Lateral derecho generado
+                    right-fill := Rectangle {
+                        horizontal-stretch: 1;
+                        height: parent.height;
+                        background: Theme.field.darker(0.3);
+
+                        // Divisor lateral
+                        Rectangle {
+                            x: 0;
+                            y: 0;
+                            width: 1px;
+                            height: parent.height;
+                            background: Theme.accent.transparentize(0.5);
+                        }
+
+                        Rectangle {
+                            width: parent.width;
+                            height: parent.height;
+                            background: @linear-gradient(90deg,
+                                Theme.accent.transparentize(0.92) 0%,
+                                Theme.accent.transparentize(0.75) 50%,
+                                Theme.accent.transparentize(0.92) 100%);
+                            opacity: 0.6 + 0.4 * root.shimmer;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            HorizontalLayout {
+                                alignment: center;
+                                Icon {
+                                    glyph: Glyph.sparkle;
+                                    size: 14px;
+                                    tint: Theme.accent;
+                                }
+                            }
+                            Text {
+                                text: root.data.fill-mode == 0 ? "Desenfoque Bokeh" : (root.data.fill-mode == 1 ? "Reflejo Espejado" : "Extensión IA");
+                                color: Theme.accent;
+                                font-size: Theme.fs-xs;
+                                font-weight: Theme.weight-title;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                if !root.data.has-photo: Text {
+                    text: "No hay foto seleccionada";
+                    color: Theme.fg-muted;
+                    font-size: Theme.fs;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+
+                // Overlay de estado ocupado
+                if root.data.busy: Rectangle {
+                    background: Colors.black.transparentize(0.35);
+                    animate background { duration: 150ms; }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 12px;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Icon {
+                                glyph: Glyph.sparkle;
+                                size: 28px;
+                                tint: Theme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: root.data.status-text != "" ? root.data.status-text : "Procesando expansión...";
+                            color: Colors.white;
+                            font-size: Theme.fs;
+                            font-weight: Theme.weight-title;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. Método de Relleno Lateral ──
+        DialogSection {
+            title: "2. Método de Relleno Lateral";
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                // Opción 0: Desenfoque Cinemático Bokeh (Relleno Inteligente)
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 52px;
+                    border-radius: Theme.r;
+                    background: root.data.fill-mode == 0 ? Theme.accent.transparentize(0.85) : (opt0-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: root.data.fill-mode == 0 ? 1.5px : 1px;
+                    border-color: root.data.fill-mode == 0 ? Theme.accent : Theme.line;
+
+                    opt0-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.fill-mode-changed(0); }
+
+                        VerticalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                Icon {
+                                    glyph: Glyph.film;
+                                    size: 13px;
+                                    tint: root.data.fill-mode == 0 ? Theme.accent : Theme.fg-muted;
+                                }
+                                Text {
+                                    text: "Desenfoque Bokeh";
+                                    font-size: Theme.fs-sm;
+                                    font-weight: Theme.weight-title;
+                                    color: root.data.fill-mode == 0 ? Theme.fg : Theme.fg-muted;
+                                }
+                            }
+                            Text {
+                                text: "100% natural, instantáneo y sin cortes";
+                                font-size: Theme.fs-xs;
+                                color: Theme.fg-dim;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+
+                // Opción 1: Reflejo Lateral Suave
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 52px;
+                    border-radius: Theme.r;
+                    background: root.data.fill-mode == 1 ? Theme.accent.transparentize(0.85) : (opt1-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: root.data.fill-mode == 1 ? 1.5px : 1px;
+                    border-color: root.data.fill-mode == 1 ? Theme.accent : Theme.line;
+
+                    opt1-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.fill-mode-changed(1); }
+
+                        VerticalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                Icon {
+                                    glyph: Glyph.flip-h;
+                                    size: 13px;
+                                    tint: root.data.fill-mode == 1 ? Theme.accent : Theme.fg-muted;
+                                }
+                                Text {
+                                    text: "Reflejo Espejado";
+                                    font-size: Theme.fs-sm;
+                                    font-weight: Theme.weight-title;
+                                    color: root.data.fill-mode == 1 ? Theme.fg : Theme.fg-muted;
+                                }
+                            }
+                            Text {
+                                text: "Difusión reflejada de los bordes";
+                                font-size: Theme.fs-xs;
+                                color: Theme.fg-dim;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+
+                // Opción 2: IA Generativa Outpainting (Experimental)
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 52px;
+                    border-radius: Theme.r;
+                    background: root.data.fill-mode == 2 ? Theme.accent.transparentize(0.85) : (opt2-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: root.data.fill-mode == 2 ? 1.5px : 1px;
+                    border-color: root.data.fill-mode == 2 ? Theme.accent : Theme.line;
+
+                    opt2-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.fill-mode-changed(2); }
+
+                        VerticalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                Icon {
+                                    glyph: Glyph.sparkle;
+                                    size: 13px;
+                                    tint: root.data.fill-mode == 2 ? Theme.accent : Theme.fg-muted;
+                                }
+                                Text {
+                                    text: "IA Generativa";
+                                    font-size: Theme.fs-sm;
+                                    font-weight: Theme.weight-title;
+                                    color: root.data.fill-mode == 2 ? Theme.fg : Theme.fg-muted;
+                                }
+                            }
+                            Text {
+                                text: "Entorno IA (requiere espera)";
+                                font-size: Theme.fs-xs;
+                                color: Theme.fg-dim;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 3. Ajuste de Intensidad / Fusión ──
+        DialogSection {
+            title: root.data.fill-mode == 0 ? "3. Intensidad de Desenfoque Ambiental" : (root.data.fill-mode == 1 ? "3. Intensidad de Difuminado Espejado" : "3. Fusión de Bordes");
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                // Nivel 0
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 30px;
+                    border-radius: Theme.r-sm;
+                    background: root.data.feather-level == 0 ? Theme.accent : (f0-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.data.feather-level == 0 ? Theme.accent : Theme.line;
+
+                    f0-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.feather-changed(0); }
+                        Text {
+                            text: root.data.fill-mode == 2 ? "Sutil (8px)" : "Ligero";
+                            font-size: Theme.fs-xs;
+                            font-weight: Theme.weight-title;
+                            color: root.data.feather-level == 0 ? Theme.on-accent : Theme.fg;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Nivel 1
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 30px;
+                    border-radius: Theme.r-sm;
+                    background: root.data.feather-level == 1 ? Theme.accent : (f1-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.data.feather-level == 1 ? Theme.accent : Theme.line;
+
+                    f1-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.feather-changed(1); }
+                        Text {
+                            text: root.data.fill-mode == 2 ? "Equilibrado (16px)" : "Equilibrado (Recomendado)";
+                            font-size: Theme.fs-xs;
+                            font-weight: Theme.weight-title;
+                            color: root.data.feather-level == 1 ? Theme.on-accent : Theme.fg;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Nivel 2
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 30px;
+                    border-radius: Theme.r-sm;
+                    background: root.data.feather-level == 2 ? Theme.accent : (f2-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.data.feather-level == 2 ? Theme.accent : Theme.line;
+
+                    f2-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.feather-changed(2); }
+                        Text {
+                            text: root.data.fill-mode == 2 ? "Amplio (24px)" : "Profundo";
+                            font-size: Theme.fs-xs;
+                            font-weight: Theme.weight-title;
+                            color: root.data.feather-level == 2 ? Theme.on-accent : Theme.fg;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 4. Indicaciones Opcionales para Gemini (solo en modo IA) ──
+        if root.data.fill-mode == 2: DialogSection {
+            title: "4. Indicaciones Opcionales para la IA";
+
+            VerticalLayout {
+                spacing: 6px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: "Gemini Vision analiza la escena con auditoría óptica milimétrica.";
+                        font-size: Theme.fs-xs;
+                        color: Theme.fg-dim;
+                        vertical-alignment: center;
+                    }
+
+                    badge := Rectangle {
+                        height: 22px;
+                        border-radius: Theme.r-xs;
+                        background: tip-touch.has-hover ? Theme.accent.transparentize(0.7) : Theme.accent.transparentize(0.85);
+                        border-width: 1px;
+                        border-color: Theme.accent;
+
+                        tip-touch := TouchArea {
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 4px;
+                            alignment: center;
+                            Icon {
+                                glyph: Glyph.sparkle;
+                                size: 11px;
+                                tint: Theme.accent;
+                            }
+                            Text {
+                                text: "Prompt VFX Activo";
+                                font-size: 10px;
+                                font-weight: Theme.weight-title;
+                                color: Theme.accent;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                if tip-touch.has-hover: Rectangle {
+                    background: Theme.well;
+                    border-radius: Theme.r-sm;
+                    border-width: 1px;
+                    border-color: Theme.accent;
+                    HorizontalLayout {
+                        padding: 8px;
+                        Text {
+                            text: "VFX Master Prompt: Escaneo de 15px de bordes, auditoría de horizonte, lentes, iluminación, seam matching en 3 cuadrantes y generación Full 16:9.";
+                            font-size: 10px;
+                            color: Theme.fg;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                input-box := Rectangle {
+                    height: 48px;
+                    background: Theme.field;
+                    border-radius: Theme.r-sm;
+                    border-width: 1px;
+                    border-color: Theme.line;
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        padding-top: 6px;
+                        padding-bottom: 6px;
+                        spacing: 8px;
+                        alignment: start;
+
+                        Icon {
+                            glyph: Glyph.sparkle;
+                            size: 13px;
+                            tint: Theme.fg-muted;
+                        }
+
+                        input := TextInput {
+                            text: root.data.prompt;
+                            font-size: Theme.fs-xs;
+                            color: Theme.fg;
+                            wrap: word-wrap;
+                            single-line: false;
+                            enabled: !root.data.busy;
+                            edited => { root.prompt-changed(self.text); }
+                        }
+                    }
+
+                    if input.text == "": Text {
+                        x: 32px;
+                        y: 15px;
+                        text: "Opcional: agrega indicaciones extra (dejar vacío para aplicar auditoría VFX)...";
+                        font-size: Theme.fs-xs;
+                        color: Theme.fg-dim;
+                        font-italic: true;
+                    }
+                }
+            }
+        }
+
+        // ── 5. Botones de acción ──
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: end;
+
+            Button {
+                label: "Cancelar";
+                enabled: !root.data.busy;
+                clicked => { root.dismissed(); }
+            }
+
+            if root.data.has-applied: Button {
+                label: "Restaurar Foto Original";
+                enabled: !root.data.busy;
+                clicked => { root.restore-original(); }
+            }
+
+            Button {
+                label: root.data.fill-mode != 2
+                    ? "✨ Aplicar Relleno 16:9 (Instantáneo)"
+                    : (root.data.has-preview ? "✨ Aplicar Expansión IA 16:9" : "✨ Generar con IA (Experimental)");
+                primary: true;
+                enabled: !root.data.busy && root.data.has-photo;
+                clicked => { root.generate(); }
+            }
+        }
+    }
+}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! Numbers into words and shapes: timecode, curves, sizes, and the drawn
 //! waveform.
@@ -140,46 +140,6 @@ pub fn eta(seconds: f32) -> String {
     }
 }
 
-/// Seconds as a rough length of time, for an estimate given before the
-/// work starts: "40s", "12 min", "3 h 20 min". Rounded to the unit it is
-/// said in, for the reason [`eta`] is.
-pub fn span(seconds: f64) -> String {
-    if seconds < 59.5 {
-        tf("format.seconds", &[&format!("{:.0}", seconds.max(1.0))])
-    } else if seconds < 3570.0 {
-        tf("format.minutes", &[&format!("{:.0}", seconds / 60.0)])
-    } else {
-        let minutes = (seconds / 60.0).round() as u64;
-        tf("format.hoursMinutes", &[&(minutes / 60), &(minutes % 60)])
-    }
-}
-
-/// A running time the way a video player's corner says it: "0:06",
-/// "12:30", "1:02:03". Whole seconds, rounded down, so a 5.9 second edit
-/// does not claim a sixth.
-pub fn running_time(seconds: f64) -> String {
-    let whole = if seconds.is_finite() {
-        seconds.max(0.0) as u64
-    } else {
-        0
-    };
-    let (hours, minutes, seconds) = (whole / 3600, whole / 60 % 60, whole % 60);
-    if hours > 0 {
-        format!("{hours}:{minutes:02}:{seconds:02}")
-    } else {
-        format!("{minutes}:{seconds:02}")
-    }
-}
-
-/// A frame rate as a person says it: "30 fps", "29.97 fps", "23.976 fps".
-/// The exact fraction is the project's; this is its name.
-pub fn rate_label(num: i64, den: i64) -> String {
-    let fps = num as f64 / den.max(1) as f64;
-    let text = format!("{fps:.3}");
-    let text = text.trim_end_matches('0').trim_end_matches('.');
-    format!("{text} fps")
-}
-
 pub fn hex_of(colour: slint::Color) -> String {
     format!(
         "#{:02x}{:02x}{:02x}",
@@ -218,8 +178,8 @@ pub fn wave_path(
     /// screen wide reads a column a pixel, few enough that the string stays
     /// under a few hundred kilobytes.
     const COLUMNS: std::ops::RangeInclusive<usize> = 8..=4096;
-    /// Silence still draws a sliver: a hairline along the floor of a clip
-    /// rather than a gap in it.
+    /// Silence still draws a sliver: a hairline through the middle of a
+    /// clip rather than a gap in it.
     const FLOOR: f32 = 0.024;
 
     if duration.is_nan() || duration <= 0.0 || peaks.finest().is_empty() {
@@ -231,10 +191,9 @@ pub fn wave_path(
 
     // Each bar is the peak of everything under its pitch, drawn on the
     // leading `bar` of it: the rest is the gap that makes it a bar and
-    // not a run of columns. Bars stand on the floor, the way CapCut draws
-    // a clip's sound: a beat reads as a spike up and silence as a hairline
-    // along the foot. They stood about the centre line for a while (#105),
-    // and the mirrored fish read as a shape, not as a level.
+    // not a run of columns. Bars stand about the centre line, the way
+    // every editor draws sound, so a beat reads as a spike both ways and
+    // silence as a hairline through the middle (#105).
     let bar = bar.clamp(0.1, 1.0);
     let pitch = 1.0 / columns as f32;
     for column in 0..columns {
@@ -244,19 +203,15 @@ pub fn wave_path(
             source_start + (left + pitch) * duration,
         );
         let right = left + pitch * bar;
-        push_bar(&mut path, left, right, high.max(-low).max(FLOOR));
+        let amplitude = high.max(-low).clamp(0.0, 1.0).max(FLOOR);
+        let top = 0.5 - amplitude / 2.0;
+        let bottom = 0.5 + amplitude / 2.0;
+        path.push_str(&format!(
+            "M {left:.4} {top:.4} L {right:.4} {top:.4} \
+             L {right:.4} {bottom:.4} L {left:.4} {bottom:.4} Z "
+        ));
     }
     path
-}
-
-/// One bar from `left` to `right` of the 1x1 box, standing on its floor
-/// and `amplitude` of the box tall.
-fn push_bar(path: &mut String, left: f32, right: f32, amplitude: f32) {
-    let top = 1.0 - amplitude.clamp(0.0, 1.0);
-    path.push_str(&format!(
-        "M {left:.4} {top:.4} L {right:.4} {top:.4} \
-         L {right:.4} 1.0000 L {left:.4} 1.0000 Z "
-    ));
 }
 
 /// A lane bar's pitch on screen, in pixels: one bar, and the gap after
@@ -271,27 +226,6 @@ pub const WAVE_PITCH: f32 = 3.0;
 /// bin's cards, at a few dozen bars across, keep a fuller bar of their
 /// own; see `media_bin`.
 pub const WAVE_BAR: f32 = 2.0 / 3.0;
-
-/// An envelope already reduced to one peak a bar - a library sound's,
-/// read once at import - drawn the way [`wave_path`] draws a file's: bars
-/// standing on the floor, each the leading `bar` of its pitch, in a 1x1
-/// box.
-pub fn bars_path(bars: &[f32], bar: f32) -> String {
-    /// See `wave_path`: silence is a hairline, not a gap.
-    const FLOOR: f32 = 0.024;
-    if bars.is_empty() {
-        return String::new();
-    }
-    let bar = bar.clamp(0.1, 1.0);
-    let pitch = 1.0 / bars.len() as f32;
-    let mut path = String::with_capacity(bars.len() * 56);
-    for (column, amplitude) in bars.iter().enumerate() {
-        let left = column as f32 * pitch;
-        let right = left + pitch * bar;
-        push_bar(&mut path, left, right, amplitude.max(FLOOR));
-    }
-    path
-}
 
 /// How many bars a span of `seconds` gets at `seconds_per_pixel`: one a
 /// [`WAVE_PITCH`], rounded up to the next sixteen so a zoom rebuilds the
@@ -324,10 +258,8 @@ pub fn when_phrase(opened_at_millis: u64) -> String {
         t("format.justNow")
     } else if hours < 1 {
         tf("format.minutesAgo", &[&minutes])
-    } else if hours < 2 {
-        t("format.anHourAgo")
     } else if days < 1 {
-        tf("format.hoursAgo", &[&hours])
+        t("format.today")
     } else if days == 1 {
         t("format.yesterday")
     } else if days < 30 {
@@ -450,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn a_waveform_has_one_floored_bar_per_column() {
+    fn a_waveform_has_one_centred_bar_per_column() {
         let peaks = concat_media::Pyramid::of(concat_media::Peaks {
             min: vec![-0.5; 2000],
             max: vec![0.5; 2000],
@@ -458,10 +390,11 @@ mod tests {
         });
         let wave = wave_path(&peaks, 0.0, 2.0, 128, WAVE_BAR);
         assert_eq!(wave.matches('M').count(), 128);
-        // A bar stands on the floor: its top is one less its height.
+        // A bar stands about the centre: half amplitude runs from a
+        // quarter of the way down to three quarters.
         assert!(
-            wave.contains(" 0.5000 L") && wave.contains(" 1.0000 Z"),
-            "half amplitude, floored: {wave}"
+            wave.contains(" 0.2500 L") && wave.contains(" 0.7500 Z"),
+            "half amplitude, centred: {wave}"
         );
         assert!(wave_path(&peaks, 0.0, 0.0, 128, WAVE_BAR).is_empty());
         assert!(wave_path(&peaks, 0.0, f32::NAN, 128, WAVE_BAR).is_empty());
@@ -480,16 +413,16 @@ mod tests {
         );
         // A bar takes `bar` of its pitch; the rest is the gap.
         let eight = wave_path(&peaks, 0.0, 2.0, 8, 0.75);
-        assert!(eight.contains("M 0.0000 0.5000 L 0.0938 0.5000"), "{eight}");
-        assert!(eight.contains("M 0.1250 0.5000 L 0.2188 0.5000"), "{eight}");
+        assert!(eight.contains("M 0.0000 0.2500 L 0.0938 0.2500"), "{eight}");
+        assert!(eight.contains("M 0.1250 0.2500 L 0.2188 0.2500"), "{eight}");
         let thin = wave_path(&peaks, 0.0, 2.0, 8, 0.5);
-        assert!(thin.contains("M 0.0000 0.5000 L 0.0625 0.5000"), "{thin}");
+        assert!(thin.contains("M 0.0000 0.2500 L 0.0625 0.2500"), "{thin}");
         // Held to a sliver at the least, and never over the pitch.
         let hair = wave_path(&peaks, 0.0, 2.0, 8, 0.0);
-        assert!(hair.contains("M 0.0000 0.5000 L 0.0125 0.5000"), "{hair}");
+        assert!(hair.contains("M 0.0000 0.2500 L 0.0125 0.2500"), "{hair}");
         let solid = wave_path(&peaks, 0.0, 2.0, 8, 7.0);
-        assert!(solid.contains("M 0.0000 0.5000 L 0.1250 0.5000"), "{solid}");
-        // Silence is a sliver on the floor, never a gap.
+        assert!(solid.contains("M 0.0000 0.2500 L 0.1250 0.2500"), "{solid}");
+        // Silence is a hairline through the middle, never a gap.
         let silence = concat_media::Pyramid::of(concat_media::Peaks {
             min: vec![0.0; 100],
             max: vec![0.0; 100],
@@ -497,7 +430,10 @@ mod tests {
         });
         let flat = wave_path(&silence, 0.0, 1.0, 10, WAVE_BAR);
         assert_eq!(flat.matches('M').count(), 10);
-        assert!(flat.contains(" 0.9760 L"), "{flat}");
+        assert!(
+            flat.contains(" 0.4880 L") && flat.contains(" 0.5120 Z"),
+            "{flat}"
+        );
     }
 
     /// A zoomed-in clip reads the fine buckets: a single loud millisecond
@@ -566,28 +502,5 @@ mod tests {
         assert_eq!(when_phrase(now), "just now");
         assert_eq!(when_phrase(now - 86_400_000 - 1000), "yesterday");
         assert_eq!(when_phrase(now - 3 * 86_400_000), "3 days ago");
-    }
-
-    #[test]
-    fn a_running_time_reads_as_a_player_says_it() {
-        assert_eq!(running_time(0.0), "0:00");
-        assert_eq!(running_time(5.9), "0:05");
-        assert_eq!(running_time(754.0), "12:34");
-        assert_eq!(running_time(3725.0), "1:02:05");
-        assert_eq!(running_time(f64::NAN), "0:00");
-        assert_eq!(rate_label(30, 1), "30 fps");
-        assert_eq!(rate_label(30000, 1001), "29.97 fps");
-        assert_eq!(rate_label(24000, 1001), "23.976 fps");
-    }
-
-    #[test]
-    fn an_estimate_is_said_in_the_unit_that_fits_it() {
-        let _english = crate::i18n::language_lock();
-        assert_eq!(span(0.2), "1s");
-        assert_eq!(span(42.4), "42s");
-        assert_eq!(span(59.6), "1 min");
-        assert_eq!(span(12.0 * 60.0 + 10.0), "12 min");
-        assert_eq!(span(3600.0), "1 h 0 min");
-        assert_eq!(span(3.0 * 3600.0 + 20.0 * 60.0), "3 h 20 min");
     }
 }

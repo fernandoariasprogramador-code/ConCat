@@ -83,11 +83,6 @@ wayland-client = "0.31"
 wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
 libc = "0.2"
 
-# `_exit`, the way out past the C++ libraries' static destructors; see
-# `leave` in lib.rs.
-[target.'cfg(target_os = "macos")'.dependencies]
-libc = "0.2"
-
 [target.'cfg(target_os = "ios")'.dependencies]
 slint = { version = "1.18", default-features = false, features = [
     "std",
@@ -101,20 +96,6 @@ slint = { version = "1.18", default-features = false, features = [
     # The base fonts registered for the window from the bytes concat-text
     # embeds, so a preset card is drawn in its own face; see fonts.rs.
     "unstable-fontique-011",
-] }
-# The system's pickers for Import and Photos for an export, through the
-# Objective-C runtime; see src/ios.rs. The versions Slint's winit backend
-# already builds on iOS, so nothing new is compiled for them.
-objc2 = "0.6"
-block2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = [
-    "std",
-    "block2",
-    "NSArray",
-    "NSError",
-    "NSObject",
-    "NSString",
-    "NSURL",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -151,14 +132,10 @@ concat-speech = { workspace = true, features = ["chatterbox"] }
 # window is open. JSON-RPC only; the gRPC feature stays with concat-cli.
 concat-server.workspace = true
 concat-api.workspace = true
-# `concat --mcp`: the same API to an AI agent, as an MCP server on standard
-# input and output, with no window (docs/MCP.md).
-concat-mcp.workspace = true
 # The effect catalogue: the inspector's shelves and each link's knobs.
 concat-effects.workspace = true
-# The cutout's mapping from a stage press to a source fraction; the model
-# itself runs in the host.
-concat-vision.workspace = true
+# The cutout's mapping from a stage press to a source fraction; face detection and cache.
+concat-vision = { workspace = true, features = ["infer"] }
 # The title painter's font list: the families on the machine and the ones
 # in a file, for the Text inspector's picker and its import button.
 concat-text.workspace = true
@@ -171,6 +148,7 @@ toml = "1.1"
 
 # JPEG encoding for the media artwork cache.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+base64 = "0.22"
 
 [build-dependencies]
 slint-build = "1.18"

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 import { I18n } from "../i18n.slint";
 import { Theme } from "../theme/theme.slint";
@@ -13,7 +13,6 @@ import { Fmt } from "../util.slint";
 import { Select } from "../primitives/select.slint";
 import { PaneScroll } from "../workspace/pane.slint";
 import { HairlineSplitter } from "../workspace/splitter.slint";
-import { Editor } from "../editor.slint";
 
 // Settings: a fixed-height sheet with a column of pages down the side. The
 // model rows keep two things apart — a downloaded model is a *choice* and so
@@ -39,11 +38,6 @@ export struct ModelData {
     /// "42 MB of 142 MB · 3.1 MB/s"
     transferred: string,
     eta: string,
-    /// why the last download failed, in a sentence; "" when it did not
-    problem: string,
-    /// the failure can be got round: the model is one file, which the
-    /// browser can fetch and the row can take
-    manual: bool,
 }
 
 /// One line of the system report: what it is called, and what it says.
@@ -52,22 +46,10 @@ export struct SystemFactData {
     value: string,
 }
 
-/// One row of the Shortcuts page: what the action is called, what key
-/// it is on, and whether that key moved from the one it ships on — the
-/// last so the row knows to offer a Reset.
-export struct ShortcutData {
-    id: string,
-    label: string,
-    /// as this platform writes it; empty when a rebind left the action
-    /// with no key at all, which the row draws as an em dash
-    keys: string,
-    custom: bool,
-}
-
 export struct SettingsData {
     open: bool,
     /// 0 General, 1 Appearance, 2 Transcriber, 3 Speech, 4 Remote, 5 About,
-    /// 6 Version, 7 Shortcuts
+    /// 6 Version
     tab: int,
     language: int,
     /// what the log records: 0 errors only, 1 warnings, 2 normal, 3
@@ -77,10 +59,6 @@ export struct SettingsData {
     playhead-stops: bool,
     /// large files get a smaller copy for playback
     proxies: bool,
-    /// the window and the compositor draw on the GPU, not in software
-    gpu: bool,
-    /// there is a software rasteriser to draw on instead: Windows, Linux
-    gpu-switchable: bool,
     /// the magnetic timeline: deleting and trimming close the gap
     magnetic: bool,
     /// where model downloads look first: automatic, Concat's mirror,
@@ -98,10 +76,6 @@ export struct SettingsData {
     server-token: string,
     /// "Listening on 127.0.0.1:7420 · 1 connected", "Off", or why not
     server-status: string,
-    /// 0 off, 1 listening, 2 could not start: the status line's dot
-    server-state: int,
-    /// the address is this computer's alone (loopback): no warning
-    server-local: bool,
     /// "3 installed · 612 MB on disk"
     disk: string,
     version: string,
@@ -119,12 +93,6 @@ export struct SettingsData {
     /// package that can be put in place; and why not, when not
     can-install: bool,
     install-note: string,
-    /// The Shortcuts page's rows, in the order the page draws them.
-    shortcuts: [ShortcutData],
-    /// The row listening for its keys: its action id, or "" when none
-    /// is. A key pressed while this is set binds instead of dispatching,
-    /// and Escape puts it back to "".
-    capturing: string,
 }
 
 // Accuracy, as pips rather than a number: five little bars say "third of five"
@@ -206,8 +174,6 @@ component ModelRow inherits Rectangle {
     callback download();
     callback cancel();
     callback remove();
-    callback open-link();
-    callback choose-file();
 
     border-radius: Theme.r;
     border-width: 1px;
@@ -344,41 +310,6 @@ component ModelRow inherits Rectangle {
                     font-family: Theme.font-technical;
                     font-size: Theme.fs-sm;
                     vertical-alignment: center;
-                }
-            }
-        }
-
-        // A download that failed says why under the name, and - when the
-        // model is one file - offers the way round a network that lets the
-        // browser through and not Concat: fetch it there, then hand the
-        // file over. Download stays the retry.
-        if root.model.problem != "" && !root.model.downloading && !root.model.installed: VerticalLayout {
-            padding-left: 26px;
-            spacing: 8px;
-
-            Text {
-                text: root.model.problem;
-                color: Theme.danger;
-                font-size: Theme.fs-sm;
-                wrap: word-wrap;
-            }
-
-            if root.model.manual: HorizontalLayout {
-                spacing: 6px;
-                alignment: start;
-
-                Button {
-                    label: I18n.t("settings.downloadInBrowser");
-                    glyph: Glyph.arrow-up-right;
-                    ghost: true;
-                    clicked => { root.open-link(); }
-                }
-
-                Button {
-                    label: I18n.t("settings.chooseFile");
-                    glyph: Glyph.folder;
-                    ghost: true;
-                    clicked => { root.choose-file(); }
                 }
             }
         }
@@ -519,111 +450,6 @@ component FactRow inherits HorizontalLayout {
     }
 }
 
-/// One row of the Shortcuts page: the action's name, the keys it is on
-/// written the way this platform writes them, and — only for the ones
-/// that moved — a way back. The row listening for its next key says so
-/// where the chord was, in the accent: the keys are the thing about to
-/// change, so that is where the eye should be. The whole row is the
-/// button, because a row you have to find a button inside is a row you
-/// miss.
-component ShortcutRow inherits Rectangle {
-    in property <string> label;
-    in property <string> keys;
-    /// the chord moved from the one it ships on (or the action was left
-    /// with none): the row draws a reset
-    in property <bool> custom;
-    /// this row is holding the window's next key
-    in property <bool> capturing;
-
-    callback pressed();
-    callback reset();
-
-    height: 30px;
-    border-radius: Theme.r-sm;
-    background: root.capturing ? Theme.accent-soft
-        : touch.has-hover ? Theme.field
-        : Colors.transparent;
-
-    animate background { duration: 100ms; easing: cubic-bezier(0.4, 0, 0.2, 1); }
-
-    // The row's press under its contents, not over them: a TouchArea
-    // drawn last covers the reset, and its press then listened for a
-    // key instead. Children get the pointer before their parent.
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.pressed(); }
-
-        HorizontalLayout {
-            padding-left: 10px;
-            padding-right: 6px;
-            spacing: 8px;
-
-            Text {
-                horizontal-stretch: 1;
-                text: root.label;
-                color: Theme.fg;
-                font-size: Theme.fs;
-                vertical-alignment: center;
-                overflow: elide;
-            }
-
-            // The chord in a chip — a key, not a word, in the face the
-            // fields keep for values. An action a rebind left with no key
-            // reads "—" rather than vanishing: it is still an action, and
-            // its reset is right beside it.
-            Rectangle {
-                height: 21px;
-                border-radius: Theme.r-sm;
-                border-width: root.capturing ? 1px : 0px;
-                border-color: root.capturing ? Theme.accent : Colors.transparent;
-                background: root.capturing ? Colors.transparent
-                    : root.keys == "" ? Colors.transparent
-                    : Theme.field-active;
-
-                HorizontalLayout {
-                    padding-left: 7px;
-                    padding-right: 7px;
-
-                    Text {
-                        text: root.capturing ? I18n.t("shortcuts.press")
-                            : root.keys == "" ? "—" : root.keys;
-                        color: root.capturing ? Theme.accent : Theme.fg;
-                        font-family: Theme.font-technical;
-                        font-size: Theme.fs;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-                }
-            }
-
-            // Not an IconButton: its own FocusScope takes focus on a press,
-            // and focus the window has lost is focus the keymap cannot use
-            // until the sheet closes. A TouchArea under an Icon moves
-            // nothing.
-            if root.custom: Rectangle {
-                width: 24px;
-                height: 20px;
-                border-radius: Theme.r-sm;
-                background: reset-touch.has-hover ? Theme.field : Colors.transparent;
-
-                Icon {
-                    glyph: Glyph.reset;
-                    size: 13px;
-                    tint: reset-touch.has-hover ? Theme.fg : Theme.fg-muted;
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                }
-
-                reset-touch := TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { root.reset(); }
-                }
-            }
-        }
-
-    }
-}
-
 export component SettingsDialog inherits Modal {
     in property <SettingsData> data;
     in property <[ModelData]> transcribers;
@@ -662,7 +488,6 @@ export component SettingsDialog inherits Modal {
     callback scale-changed(index: int);
     callback playhead-stops-changed(on: bool);
     callback proxies-changed(on: bool);
-    callback gpu-changed(on: bool);
     callback magnetic-changed(on: bool);
     callback download-source-changed(index: int);
     callback download-base-edited(text: string);
@@ -681,17 +506,6 @@ export component SettingsDialog inherits Modal {
     callback model-download(id: string);
     callback model-cancel(id: string);
     callback model-remove(id: string);
-    callback model-open-link(id: string);
-    callback model-choose-file(id: string);
-    /// The Shortcuts page: a row asked for the next keys it should be
-    /// bound to, one row put back as it ships, and all of them put back.
-    callback shortcut-capture(id: string);
-    callback shortcut-reset(id: string);
-    callback shortcut-reset-all();
-    /// Focus handed back to the window's own scope, where the keymap
-    /// listens: the capture field gives it up when its key has been
-    /// heard, and the window answers with its own `keys.focus()`.
-    callback focus-keys();
 
     /// `Theme.accent-names`, each in the chosen language, in the same order.
     /// A second list rather than a lookup on the first because the string
@@ -722,20 +536,12 @@ export component SettingsDialog inherits Modal {
     property <[{label: string, glyph: Glyph, page: int, desk: bool}]> page-list: [
         {label: I18n.t("settings.general"), glyph: Glyph.settings, page: 0, desk: false},
         {label: I18n.t("settings.appearance"), glyph: Glyph.sun, page: 1, desk: false},
-        // The keys: a desk's, since a phone has no keyboard to bind.
-        {label: I18n.t("settings.shortcuts"), glyph: Glyph.keyboard, page: 7, desk: true},
         {label: I18n.t("common.transcriber"), glyph: Glyph.waveform, page: 2, desk: false},
         {label: I18n.t("common.speech"), glyph: Glyph.music, page: 3, desk: false},
         {label: I18n.t("settings.automation"), glyph: Glyph.lock, page: 4, desk: true},
         {label: I18n.t("settings.version"), glyph: Glyph.tag, page: 6, desk: true},
         {label: I18n.t("settings.about"), glyph: Glyph.sparkle, page: 5, desk: false},
     ];
-
-    /// The launch screen is up: no project, so no dispatch. The capture
-    /// field still works there — binding a key is not an edit — but the
-    /// key it hands over says this so the window can refuse to dispatch
-    /// one once capture is over.
-    in property <bool> on-start;
 
     /// The column of pages' width, as the hairline beside it was last left.
     /// In-out because it is dragged; what is drawn is `pages` below, which
@@ -752,9 +558,6 @@ export component SettingsDialog inherits Modal {
     /// Off each time the sheet opens: showing it is a decision for the
     /// moment, not a setting.
     property <bool> token-shown;
-    /// Copy was pressed a moment ago: its mark is a tick for a second
-    /// and a half, so the press is seen to have worked.
-    property <bool> token-copied;
     changed open => {
         if (!root.open) {
             root.token-shown = false;
@@ -999,20 +802,6 @@ export component SettingsDialog inherits Modal {
                     switched(on) => { root.proxies-changed(on); }
                 }
 
-                // Off, the window and the compositor draw in software:
-                // slower, but out of the way of a graphics driver that
-                // closes the app. A launch that dies while starting turns
-                // it off by itself. Read when Concat starts. Only where
-                // there is a software rasteriser: WARP, lavapipe.
-                if root.data.gpu-switchable: DialogSection {
-                    title: I18n.t("settings.gpu");
-                    hint: I18n.t("settings.gpuHint");
-                    switchable: true;
-                    on: root.data.gpu;
-                    open: false;
-                    switched(on) => { root.gpu-changed(on); }
-                }
-
             }
 
             // Read straight off the Theme global rather than through
@@ -1210,7 +999,7 @@ export component SettingsDialog inherits Modal {
                     Select {
                         options: [
                             I18n.t("settings.scaleSystem"),
-                            "100%", "110%", "125%", "150%", "175%", "200%",
+                            "100%", "125%", "150%", "175%", "200%",
                         ];
                         current: Theme.ui-scale;
                         changed(index) => { root.scale-changed(index); }
@@ -1231,8 +1020,6 @@ export component SettingsDialog inherits Modal {
                         download => { root.model-download(model.id); }
                         cancel => { root.model-cancel(model.id); }
                         remove => { root.model-remove(model.id); }
-                        open-link => { root.model-open-link(model.id); }
-                        choose-file => { root.model-choose-file(model.id); }
                     }
 
                     HorizontalLayout {
@@ -1276,17 +1063,14 @@ export component SettingsDialog inherits Modal {
                         download => { root.model-download(model.id); }
                         cancel => { root.model-cancel(model.id); }
                         remove => { root.model-remove(model.id); }
-                        open-link => { root.model-open-link(model.id); }
-                        choose-file => { root.model-choose-file(model.id); }
                     }
                 }
             }
 
             // The API on a socket. The switch is the whole of it for most
-            // people, with a line under it saying what the server is doing;
-            // the address and the token are there for the one who is
-            // putting a script on another machine, and the page says
-            // plainly when the address it is given reaches past this one.
+            // people; the address and the token are there for the one who
+            // is putting a script on another machine, and the hints say
+            // what that opens.
             if root.data.tab == 4 && !root.phone: VerticalLayout {
                 DialogSection {
                     ruled: false;
@@ -1297,124 +1081,67 @@ export component SettingsDialog inherits Modal {
                     on: root.data.server-enabled;
                     switched(on) => { root.server-enabled-changed(on); }
 
-                    // What the server is doing, at a glance: a green dot
-                    // while it listens, a red one when it could not start,
-                    // a dim one when it is off.
-                    HorizontalLayout {
-                        spacing: 8px;
-
-                        VerticalLayout {
-                            alignment: center;
-                            Rectangle {
-                                width: 8px;
-                                height: 8px;
-                                border-radius: self.width / 2;
-                                background: root.data.server-state == 1 ? Theme.green
-                                    : root.data.server-state == 2 ? Theme.danger
-                                    : Theme.fg-dim;
-                            }
-                        }
-
-                        Text {
-                            horizontal-stretch: 1;
-                            text: root.data.server-status;
-                            color: root.data.server-state == 2 ? Theme.danger : Theme.fg-muted;
-                            font-family: root.data.server-state == 1 ? Theme.font-technical : Theme.font;
-                            font-size: Theme.fs-sm;
-                            vertical-alignment: center;
-                            wrap: word-wrap;
-                        }
-                    }
-
                     Text {
-                        text: I18n.t("settings.agentsConnectWithMcp");
+                        text: root.data.server-status;
                         color: Theme.fg-muted;
+                        font-family: Theme.font-technical;
                         font-size: Theme.fs-sm;
                         wrap: word-wrap;
                     }
                 }
 
                 DialogSection {
+
                     ruled: false;
                     title: I18n.t("settings.address");
-                    hint: I18n.t("settings.addressHint");
+                    hint: I18n.t("settings.localAddressWarning");
 
-                    // One field in two parts on one ground: the address,
-                    // a colon nobody has to type, drawn as the field's own
-                    // dim text rather than a band of its own, and the port
-                    // as a number held to what a port can be.
-                    Rectangle {
-                        min-height: 28px;
-                        max-height: 28px;
-                        border-radius: Theme.r;
-                        background: Theme.field;
-                        clip: true;
+                    // One control in two halves: the address, a fixed
+                    // colon nobody has to type, and the port as a number
+                    // held to what a port can be.
+                    HorizontalLayout {
+                        spacing: 0;
 
-                        HorizontalLayout {
-                            spacing: 0;
+                        Field {
+                            value: root.data.server-host;
+                            placeholder: "127.0.0.1";
+                            technical: true;
+                            radius-right: 0px;
+                            edited(text) => { root.server-host-edited(text); }
+                        }
 
-                            Field {
-                                value: root.data.server-host;
-                                placeholder: "127.0.0.1";
-                                technical: true;
-                                radius-right: 0px;
-                                edited(text) => { root.server-host-edited(text); }
-                            }
+                        Rectangle {
+                            width: 18px;
+                            min-height: 28px;
+                            max-height: 28px;
+                            background: Theme.well;
 
                             Text {
-                                width: 10px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
                                 text: ":";
                                 color: Theme.fg-dim;
                                 font-family: Theme.font-technical;
                                 font-size: Theme.fs;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            NumberField {
-                                width: 72px;
-                                horizontal-stretch: 0;
-                                radius-left: 0px;
-                                value: root.data.server-port;
-                                minimum: 0;
-                                maximum: 65535;
-                                step: 1;
-                                precision: 0;
-                                changed(port) => { root.server-port-edited(port); }
                             }
                         }
-                    }
 
-                    // Past loopback, said where it is decided, with the way
-                    // back beside it.
-                    if !root.data.server-local: Rectangle {
-                        border-radius: Theme.r;
-                        background: Theme.danger-soft;
-
-                        HorizontalLayout {
-                            padding: 8px;
-                            spacing: 8px;
-
-                            Text {
-                                horizontal-stretch: 1;
-                                text: I18n.t("settings.exposedAddressWarning");
-                                color: Theme.fg;
-                                font-size: Theme.fs-sm;
-                                wrap: word-wrap;
-                                vertical-alignment: center;
-                            }
-                            VerticalLayout {
-                                alignment: center;
-                                Button {
-                                    label: I18n.t("settings.thisComputerOnly");
-                                    clicked => { root.server-host-edited("127.0.0.1"); }
-                                }
-                            }
+                        NumberField {
+                            width: 76px;
+                            horizontal-stretch: 0;
+                            radius-left: 0px;
+                            value: root.data.server-port;
+                            minimum: 0;
+                            maximum: 65535;
+                            step: 1;
+                            precision: 0;
+                            changed(port) => { root.server-port-edited(port); }
                         }
                     }
                 }
 
                 DialogSection {
+
                     ruled: false;
                     title: I18n.t("settings.token");
                     hint: I18n.t("settings.whatConnectionMustPresent");
@@ -1422,64 +1149,28 @@ export component SettingsDialog inherits Modal {
                     // Dots until asked, the way a password field is: the
                     // token is what lets a connection in, and Settings is
                     // open on screens other people look at. The eye shows
-                    // it for as long as the sheet is up; Copy takes it
-                    // without showing it, and the arrow makes a new one.
-                    Rectangle {
-                        min-height: 28px;
-                        max-height: 28px;
+                    // it for as long as the sheet is up.
+                    HorizontalLayout {
+                        spacing: 6px;
 
-                        HorizontalLayout {
-                            spacing: 6px;
-
-                            Field {
-                                value: root.data.server-token;
-                                placeholder: I18n.t("common.none");
-                                technical: true;
-                                secret: !root.token-shown;
-                                edited(text) => { root.server-token-edited(text); }
-                            }
-
-                            Button {
-                                square: true;
-                                glyph: root.token-shown ? Glyph.eye-off : Glyph.eye;
-                                label: root.token-shown ? I18n.t("settings.hideTheToken") : I18n.t("settings.showTheToken");
-                                clicked => { root.token-shown = !root.token-shown; }
-                            }
-
-                            Button {
-                                square: true;
-                                glyph: root.token-copied ? Glyph.check : Glyph.copy;
-                                label: I18n.t("settings.copyTheToken");
-                                enabled: root.data.server-token != "";
-                                clicked => {
-                                    token-copy.select-all();
-                                    token-copy.copy();
-                                    root.token-copied = true;
-                                }
-                            }
-
-                            Button {
-                                glyph: Glyph.reset;
-                                label: I18n.t("settings.newToken");
-                                clicked => { root.server-token-generated(); }
-                            }
+                        Field {
+                            value: root.data.server-token;
+                            placeholder: I18n.t("common.none");
+                            technical: true;
+                            secret: !root.token-shown;
+                            edited(text) => { root.server-token-edited(text); }
                         }
 
-                        // What Copy copies from: the token, out of sight.
-                        token-copy := TextInput {
-                            x: 0;
-                            y: 0;
-                            width: 1px;
-                            height: 1px;
-                            opacity: 0;
-                            text: root.data.server-token;
-                            read-only: true;
+                        Button {
+                            square: true;
+                            glyph: root.token-shown ? Glyph.eye-off : Glyph.eye;
+                            label: root.token-shown ? I18n.t("settings.hideTheToken") : I18n.t("settings.showTheToken");
+                            clicked => { root.token-shown = !root.token-shown; }
                         }
 
-                        Timer {
-                            interval: 1500ms;
-                            running: root.token-copied;
-                            triggered => { root.token-copied = false; }
+                        Button {
+                            label: I18n.t("settings.newToken");
+                            clicked => { root.server-token-generated(); }
                         }
                     }
                 }
@@ -1682,77 +1373,7 @@ export component SettingsDialog inherits Modal {
                     }
                 }
             }
-
-            if root.data.tab == 7 && !root.phone: VerticalLayout {
-                DialogSection {
-                    first: true;
-                    title: I18n.t("settings.shortcuts");
-                    hint: I18n.t("shortcuts.hint");
-
-                    // Flat rows, one per action, the way the system report
-                    // draws its lines: a page of chords is scanned, not
-                    // browsed, and cards would put a border between every
-                    // key and its neighbour.
-                    VerticalLayout {
-                        spacing: 2px;
-
-                        for row in root.data.shortcuts: ShortcutRow {
-                            label: row.label;
-                            keys: row.keys;
-                            custom: row.custom;
-                            capturing: root.data.capturing == row.id;
-
-                            pressed => {
-                                root.shortcut-capture(row.id);
-                                capture-scope.focus();
-                            }
-                            reset => { root.shortcut-reset(row.id); }
-                        }
-                    }
-
-                    // Back to how they all ship, in one press: the escape
-                    // hatch a page of rebinds needs when the keys have gone
-                    // too far to walk back a row at a time.
-                    Button {
-                        label: I18n.t("shortcuts.resetAll");
-                        glyph: Glyph.reset;
-                        ghost: true;
-                        clicked => { root.shortcut-reset-all(); }
-                    }
-                }
-            }
         }
-        }
-    }
-
-    // The Shortcuts page's field: a scope that exists for the dialog's
-    // whole life, so switching pages while it listens cannot destroy it
-    // and leave the window with no focused key handler. A row press
-    // focuses it; the first key it hears is the one that binds — Rust
-    // answers through Editor.key-chord — and the moment that key is
-    // spent, focus goes back to the window's own scope, where the
-    // keymap and the window's fixed bindings live.
-    capture-scope := FocusScope {
-        width: 0px;
-        height: 0px;
-
-        key-pressed(event) => {
-            if (root.data.capturing == "") {
-                // Nothing is listening any more: the capture was put
-                // down some other way. Hand focus back and let the key
-                // go where it would have gone.
-                root.focus-keys();
-                return reject;
-            }
-            let handled = Editor.key-chord(event.text, event.modifiers.shift,
-                event.modifiers.alt, event.modifiers.control,
-                event.modifiers.meta, root.on-start);
-            if (root.data.capturing == "") {
-                // The key was the one — bound, or Escape declining it —
-                // and the row is no longer listening.
-                root.focus-keys();
-            }
-            return handled ? accept : reject;
         }
     }
 }

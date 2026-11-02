@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! gRPC over HTTP/2, through tonic.
 //!
@@ -29,7 +29,6 @@ use serde_json::{Value, json};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Status};
 
-use crate::throttle::{Peer, Throttle};
 use crate::{Hub, token};
 
 /// The generated messages and service.
@@ -132,7 +131,6 @@ pub(crate) fn serve(
     hub: Hub,
     token: String,
     stop: Arc<AtomicBool>,
-    throttle: Arc<Throttle>,
 ) -> Result<(SocketAddr, JoinHandle<()>), String> {
     let could_not =
         |error: &dyn std::fmt::Display| format!("could not listen on {address}: {error}");
@@ -160,8 +158,7 @@ pub(crate) fn serve(
                     return;
                 };
                 let incoming = tokio_stream::wrappers::TcpListenerStream::new(listener);
-                let service =
-                    ConcatServer::with_interceptor(Service { hub }, bearer(token, throttle));
+                let service = ConcatServer::with_interceptor(Service { hub }, bearer(token));
                 let stopped = async move {
                     while !stop.load(Ordering::SeqCst) {
                         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -178,33 +175,18 @@ pub(crate) fn serve(
 }
 
 /// The check every call passes through: the token as a bearer, compared
-/// in constant time, from an address the throttle is not holding back.
-fn bearer(
-    token: String,
-    throttle: Arc<Throttle>,
-) -> impl Fn(Request<()>) -> Result<Request<()>, Status> + Clone {
+/// in constant time.
+fn bearer(token: String) -> impl Fn(Request<()>) -> Result<Request<()>, Status> + Clone {
     let expected = format!("Bearer {token}");
     move |request: Request<()>| {
-        let peer = request
-            .remote_addr()
-            .map(|address| Peer::Ip(address.ip()))
-            .unwrap_or(Peer::Local);
-        if let Some(wait) = throttle.wait(peer) {
-            return Err(Status::resource_exhausted(format!(
-                "too many wrong tokens from this address: try again in {} s",
-                wait.as_secs().max(1)
-            )));
-        }
         let presented = request
             .metadata()
             .get("authorization")
             .and_then(|value| value.to_str().ok())
             .unwrap_or_default();
         if token::matches(presented.as_bytes(), expected.as_bytes()) {
-            throttle.succeeded(peer);
             Ok(request)
         } else {
-            throttle.failed(peer);
             Err(Status::unauthenticated("the token is missing or wrong"))
         }
     }
@@ -291,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_token_travels_as_a_bearer() {
-        let (server, _scratch) = server(Some(crate::tests::TOKEN));
+        let (server, _scratch) = server(Some("open sesame"));
         let address = server.grpc_addr().expect("listening");
         let mut client = ConcatClient::connect(format!("http://{address}"))
             .await
@@ -310,7 +292,7 @@ mod tests {
 
         assert!(
             client
-                .call(with_bearer(version(), crate::tests::TOKEN))
+                .call(with_bearer(version(), "open sesame"))
                 .await
                 .is_ok()
         );

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 //! Command line driver for the Concat engine.
 //!
@@ -210,9 +210,6 @@ fn serve(
         grpc,
         token,
         roots,
-        // The listing is the window's: a server in a terminal prints its
-        // address and token for whoever started it.
-        discovery: None,
     };
     let server = concat_server::Server::start(config, concat_api::Api::new)?;
     if let Some(address) = server.json_addr() {

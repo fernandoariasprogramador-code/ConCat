@@ -1,0 +1,1747 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
+
+import { Theme } from "../theme/theme.slint";
+import { Glyph, Icon } from "../icons.slint";
+import { Tip } from "../primitives/tooltip.slint";
+import { Pane, PaneHeader, PaneScroll } from "pane.slint";
+import { PaneKind, PaneSwitcher } from "pane-switcher.slint";
+
+export struct AssistantMessageData {
+    id: string,
+    sender: string,
+    text: string,
+    has-action: bool,
+    action-description: string,
+    action-status: string,
+    timestamp: string,
+}
+
+component MessageCopyButton inherits Rectangle {
+    in property <string> text;
+    property <bool> done;
+
+    width: 22px;
+    height: 22px;
+    border-radius: Theme.r-sm;
+    background: touch.has-hover ? Theme.field-hover : Theme.field;
+    border-width: 1px;
+    border-color: touch.has-hover ? Theme.line-strong : Theme.line;
+
+    animate background, border-color { duration: 100ms; }
+
+    hidden := TextInput {
+        x: 0;
+        y: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        text: root.text;
+        read-only: true;
+    }
+
+    Icon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        size: 11px;
+        glyph: root.done ? Glyph.check : Glyph.copy;
+        tint: root.done ? Theme.green : (touch.has-hover ? Theme.fg : Theme.fg-muted);
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            hidden.select-all();
+            hidden.copy();
+            root.done = true;
+        }
+    }
+
+    Timer {
+        interval: 1500ms;
+        running: root.done;
+        triggered => { root.done = false; }
+    }
+}
+
+component AssistantChatContent inherits VerticalLayout {
+    in property <bool> autonomous: true;
+    in property <bool> logged-in: false;
+    in property <string> user-email: "";
+    in property <[AssistantMessageData]> messages: [];
+    in property <bool> busy: false;
+    in property <string> status: "";
+    in property <string> model-name: "gemini-3.5-flash";
+
+    callback send-message(string);
+    callback approve-action(string);
+    callback reject-action(string);
+    callback mode-changed(bool);
+    callback login();
+    callback model-changed(string);
+
+    // ── Chat Body (Scrollable Messages Area) ──
+    PaneScroll {
+        VerticalLayout {
+            padding-left: 14px;
+            padding-right: 14px;
+            padding-top: 14px;
+            padding-bottom: 14px;
+            spacing: 14px;
+
+            // ── Empty State / Antigravity IDE Welcome ──
+            if root.messages.length == 0: VerticalLayout {
+                spacing: 16px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                alignment: center;
+
+                // Glowing Antigravity Agent Orb
+                HorizontalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 58px;
+                        height: 58px;
+                        border-radius: 29px;
+                        background: Theme.accent;
+                        drop-shadow-blur: 16px;
+                        drop-shadow-color: Theme.accent.with-alpha(0.5);
+
+                        // Inner gloss reflection
+                        Rectangle {
+                            x: 8px;
+                            y: 4px;
+                            width: parent.width - 16px;
+                            height: 22px;
+                            border-radius: 11px;
+                            background: #ffffff33;
+                        }
+
+                        Icon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 26px;
+                            glyph: Glyph.sparkle;
+                            tint: Theme.on-accent;
+                        }
+                    }
+                }
+
+                // Title & Description
+                VerticalLayout {
+                    spacing: 4px;
+                    alignment: center;
+
+                    Text {
+                        text: "Antigravity Video Agent";
+                        font-family: Theme.font;
+                        font-size: 15px;
+                        font-weight: 700;
+                        color: Theme.fg;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: "Copiloto IA inteligente con control nativo sobre la línea de tiempo, clips, audio y efectos de Concat.";
+                        font-family: Theme.font;
+                        font-size: 11px;
+                        color: Theme.fg-muted;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                // Capability Slash-Command Cards
+                VerticalLayout {
+                    spacing: 8px;
+
+                    // Primary call to action until the user signs in
+                    if !root.logged-in: Rectangle {
+                        height: 44px;
+                        background: Theme.accent-soft;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: Theme.accent.with-alpha(0.4);
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.login(); }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: Theme.r-sm;
+                                        background: Theme.accent;
+
+                                        Icon {
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            size: 14px;
+                                            glyph: Glyph.sparkle;
+                                            tint: Theme.on-accent;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text {
+                                        text: "Continuar con Google";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        color: Theme.fg;
+                                    }
+                                    Text {
+                                        text: "Inicia sesión con tu cuenta para usar Gemini";
+                                        font-family: Theme.font;
+                                        font-size: 10px;
+                                        color: Theme.fg-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Suggestion 1: Silence cut
+                    card1 := Rectangle {
+                        height: 44px;
+                        background: card1-touch.has-hover ? Theme.field-hover : Theme.field;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: card1-touch.has-hover ? Theme.line-strong : Theme.line;
+
+                        animate background, border-color { duration: 100ms; }
+
+                        card1-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.send-message("Detecta los silencios y pausas largas en el audio del proyecto y recórtalos automáticamente.");
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: Theme.r-sm;
+                                        background: Theme.raised;
+                                        border-width: 1px;
+                                        border-color: Theme.line;
+
+                                        Icon {
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            size: 14px;
+                                            glyph: Glyph.volume-off;
+                                            tint: Theme.accent;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text {
+                                        text: "/silencios · Cortar silencios y pausas";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: Theme.fg;
+                                    }
+                                    Text {
+                                        text: "Elimina tiempos muertos para dar ritmo dinámico";
+                                        font-family: Theme.font;
+                                        font-size: 10px;
+                                        color: Theme.fg-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Suggestion 2: Split clip
+                    card2 := Rectangle {
+                        height: 44px;
+                        background: card2-touch.has-hover ? Theme.field-hover : Theme.field;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: card2-touch.has-hover ? Theme.line-strong : Theme.line;
+
+                        animate background, border-color { duration: 100ms; }
+
+                        card2-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.send-message("Divide el clip activo en la posición actual del cursor de reproducción.");
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: Theme.r-sm;
+                                        background: Theme.raised;
+                                        border-width: 1px;
+                                        border-color: Theme.line;
+
+                                        Icon {
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            size: 14px;
+                                            glyph: Glyph.razor;
+                                            tint: #c084fc;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text {
+                                        text: "/dividir · Cortar clip en cabezal";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: Theme.fg;
+                                    }
+                                    Text {
+                                        text: "Realiza un corte preciso sin perder sincronía";
+                                        font-family: Theme.font;
+                                        font-size: 10px;
+                                        color: Theme.fg-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Suggestion 3: Subtitles
+                    card3 := Rectangle {
+                        height: 44px;
+                        background: card3-touch.has-hover ? Theme.field-hover : Theme.field;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: card3-touch.has-hover ? Theme.line-strong : Theme.line;
+
+                        animate background, border-color { duration: 100ms; }
+
+                        card3-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.send-message("Genera subtítulos automáticos para la pista de voz principal.");
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: Theme.r-sm;
+                                        background: Theme.raised;
+                                        border-width: 1px;
+                                        border-color: Theme.line;
+
+                                        Icon {
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            size: 14px;
+                                            glyph: Glyph.waveform;
+                                            tint: Theme.green;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text {
+                                        text: "/subtítulos · Generar títulos de voz";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: Theme.fg;
+                                    }
+                                    Text {
+                                        text: "Transcribe el audio y añade clips de texto";
+                                        font-family: Theme.font;
+                                        font-size: 10px;
+                                        color: Theme.fg-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Suggestion 4: Project Summary
+                    card4 := Rectangle {
+                        height: 44px;
+                        background: card4-touch.has-hover ? Theme.field-hover : Theme.field;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: card4-touch.has-hover ? Theme.line-strong : Theme.line;
+
+                        animate background, border-color { duration: 100ms; }
+
+                        card4-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.send-message("Inspecciona el proyecto completo y haz un resumen de clips, duración y resolución.");
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: center;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: Theme.r-sm;
+                                        background: Theme.raised;
+                                        border-width: 1px;
+                                        border-color: Theme.line;
+
+                                        Icon {
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            size: 14px;
+                                            glyph: Glyph.film;
+                                            tint: #fbbf24;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text {
+                                        text: "/resumen · Inspeccionar proyecto";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: Theme.fg;
+                                    }
+                                    Text {
+                                        text: "Reporte de pistas, duración total y medios";
+                                        font-family: Theme.font;
+                                        font-size: 10px;
+                                        color: Theme.fg-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Messages Stream ──
+            for msg in root.messages: VerticalLayout {
+                spacing: 6px;
+
+                // ── User Message Card ──
+                if msg.sender == "user": HorizontalLayout {
+                    alignment: end;
+
+                    Rectangle {
+                        max-width: parent.width * 0.88;
+                        background: Theme.raised;
+                        border-radius: Theme.r;
+                        border-width: 1px;
+                        border-color: Theme.line-strong;
+
+                        VerticalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            padding-top: 8px;
+                            padding-bottom: 8px;
+                            spacing: 4px;
+
+                            HorizontalLayout {
+                                alignment: space-between;
+                                spacing: 6px;
+
+                                Text {
+                                    text: "Tú";
+                                    font-family: Theme.font;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    color: Theme.accent;
+                                    vertical-alignment: center;
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: end;
+
+                                    if msg.timestamp != "": Text {
+                                        text: msg.timestamp;
+                                        font-family: Theme.font;
+                                        font-size: 9px;
+                                        color: Theme.fg-dim;
+                                        vertical-alignment: center;
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        MessageCopyButton {
+                                            text: msg.text;
+                                        }
+                                    }
+                                }
+                            }
+
+                            TextInput {
+                                text: msg.text;
+                                font-family: Theme.font;
+                                font-size: 12px;
+                                color: Theme.fg;
+                                read-only: true;
+                                single-line: false;
+                                wrap: word-wrap;
+                                selection-background-color: Theme.accent;
+                                selection-foreground-color: Theme.on-accent;
+                            }
+                        }
+                    }
+                }
+
+                // ── Assistant Message Card ──
+                if msg.sender != "user": VerticalLayout {
+                    spacing: 6px;
+
+                    HorizontalLayout {
+                        alignment: start;
+
+                        Rectangle {
+                            width: parent.width;
+                            background: Theme.field;
+                            border-radius: Theme.r;
+                            border-width: 1px;
+                            border-color: Theme.line;
+
+                            VerticalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                padding-top: 10px;
+                                padding-bottom: 10px;
+                                spacing: 6px;
+
+                                // Header: Avatar + Model Tag + Copy Button
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    spacing: 8px;
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                width: 20px;
+                                                height: 20px;
+                                                border-radius: Theme.r-sm;
+                                                background: Theme.accent;
+
+                                                Icon {
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                    size: 12px;
+                                                    glyph: Glyph.sparkle;
+                                                    tint: Theme.on-accent;
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Gemini AI";
+                                            font-family: Theme.font;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            color: Theme.fg;
+                                            vertical-alignment: center;
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                height: 16px;
+                                                border-radius: Theme.r-sm;
+                                                background: Theme.field;
+                                                border-width: 1px;
+                                                border-color: Theme.line;
+                                                HorizontalLayout {
+                                                    padding-left: 4px;
+                                                    padding-right: 4px;
+                                                    Text {
+                                                        text: root.model-name;
+                                                        font-family: Theme.font;
+                                                        font-size: 9px;
+                                                        color: Theme.fg-muted;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: end;
+
+                                        if msg.timestamp != "": Text {
+                                            text: msg.timestamp;
+                                            font-family: Theme.font;
+                                            font-size: 9px;
+                                            color: Theme.fg-dim;
+                                            vertical-alignment: center;
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            MessageCopyButton {
+                                                text: msg.text;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Message Body
+                                if msg.text != "": TextInput {
+                                    text: msg.text;
+                                    font-family: Theme.font;
+                                    font-size: 12px;
+                                    color: Theme.fg;
+                                    read-only: true;
+                                    single-line: false;
+                                    wrap: word-wrap;
+                                    selection-background-color: Theme.accent;
+                                    selection-foreground-color: Theme.on-accent;
+                                }
+
+                                // ── Antigravity IDE Tool Execution / Action Card ──
+                                if msg.has-action: Rectangle {
+                                    background: Theme.well;
+                                    border-radius: Theme.r;
+                                    border-width: 1px;
+                                    border-color: msg.action-status == "applied" ? Theme.green : (msg.action-status == "rejected" ? Theme.line : Theme.accent);
+
+                                    // Left accent bar
+                                    Rectangle {
+                                        x: 0;
+                                        width: 3px;
+                                        height: parent.height;
+                                        background: msg.action-status == "applied" ? Theme.green : (msg.action-status == "rejected" ? Theme.fg-dim : Theme.accent);
+                                    }
+
+                                    VerticalLayout {
+                                        padding-left: 12px;
+                                        padding-right: 10px;
+                                        padding-top: 8px;
+                                        padding-bottom: 8px;
+                                        spacing: 6px;
+
+                                        // Step Header (Monospace IDE style)
+                                        HorizontalLayout {
+                                            alignment: space-between;
+
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Icon {
+                                                        size: 12px;
+                                                        glyph: Glyph.razor;
+                                                        tint: msg.action-status == "applied" ? Theme.green : Theme.accent;
+                                                    }
+                                                }
+                                                Text {
+                                                    text: "EJECUCIÓN DE EDICIÓN";
+                                                    font-family: Theme.font;
+                                                    font-size: 10px;
+                                                    font-weight: 700;
+                                                    color: Theme.fg;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+
+                                            // Status Badge
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Rectangle {
+                                                    height: 18px;
+                                                    border-radius: Theme.r-sm;
+                                                    background: msg.action-status == "applied" ? Theme.green.with-alpha(0.15) : (msg.action-status == "rejected" ? Theme.line : #f59e0b22);
+                                                    border-width: 1px;
+                                                    border-color: msg.action-status == "applied" ? Theme.green : (msg.action-status == "rejected" ? Theme.line-strong : #f59e0b66);
+
+                                                    HorizontalLayout {
+                                                        padding-left: 6px;
+                                                        padding-right: 6px;
+                                                        Text {
+                                                            text: msg.action-status == "applied" ? "✓ APLICADO" : (msg.action-status == "rejected" ? "✕ DESCARTADO" : "⚡ PENDIENTE DE REVISIÓN");
+                                                            font-family: Theme.font;
+                                                            font-size: 9px;
+                                                            font-weight: 700;
+                                                            color: msg.action-status == "applied" ? Theme.green : (msg.action-status == "rejected" ? Theme.fg-muted : #fbbf24);
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Tool Description
+                                        TextInput {
+                                            text: msg.action-description;
+                                            font-family: Theme.font;
+                                            font-size: 11px;
+                                            color: Theme.fg-muted;
+                                            read-only: true;
+                                            single-line: false;
+                                            wrap: word-wrap;
+                                            selection-background-color: Theme.accent;
+                                            selection-foreground-color: Theme.on-accent;
+                                        }
+
+                                        // Approval Buttons (Copilot Mode)
+                                        if msg.action-status == "pending" || msg.action-status == "proposed": HorizontalLayout {
+                                            spacing: 10px;
+                                            alignment: end;
+
+                                            // Approve Button
+                                            approve-btn := Rectangle {
+                                                height: 30px;
+                                                background: approve-touch.has-hover ? Theme.green.darker(0.1) : Theme.green;
+                                                border-radius: Theme.r-sm;
+                                                border-width: 1px;
+                                                border-color: approve-touch.has-hover ? Theme.green.brighter(0.2) : Theme.green;
+
+                                                approve-touch := TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => { root.approve-action(msg.id); }
+
+                                                    HorizontalLayout {
+                                                        padding-left: 14px;
+                                                        padding-right: 14px;
+                                                        spacing: 6px;
+                                                        alignment: center;
+
+                                                        VerticalLayout {
+                                                            alignment: center;
+                                                            Icon {
+                                                                size: 12px;
+                                                                glyph: Glyph.check;
+                                                                tint: #ffffff;
+                                                            }
+                                                        }
+                                                        Text {
+                                                            text: "Aprobar y Aplicar";
+                                                            font-family: Theme.font;
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: #ffffff;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Reject Button
+                                            reject-btn := Rectangle {
+                                                height: 30px;
+                                                background: reject-touch.has-hover ? Theme.field-hover : Theme.field;
+                                                border-width: 1px;
+                                                border-color: reject-touch.has-hover ? Theme.line-strong : Theme.line;
+                                                border-radius: Theme.r-sm;
+
+                                                reject-touch := TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => { root.reject-action(msg.id); }
+
+                                                    HorizontalLayout {
+                                                        padding-left: 12px;
+                                                        padding-right: 12px;
+                                                        spacing: 6px;
+                                                        alignment: center;
+
+                                                        VerticalLayout {
+                                                            alignment: center;
+                                                            Icon {
+                                                                size: 11px;
+                                                                glyph: Glyph.close;
+                                                                tint: reject-touch.has-hover ? Theme.danger : Theme.fg-muted;
+                                                            }
+                                                        }
+                                                        Text {
+                                                            text: "Descartar";
+                                                            font-family: Theme.font;
+                                                            font-size: 11px;
+                                                            font-weight: 600;
+                                                            color: reject-touch.has-hover ? Theme.fg : Theme.fg-muted;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Prominent Loading & Status Card when busy ──
+            if root.busy: HorizontalLayout {
+                alignment: start;
+
+                Rectangle {
+                    width: parent.width;
+                    height: 52px;
+                    background: Theme.well;
+                    border-radius: Theme.r;
+                    border-width: 1px;
+                    border-color: Theme.accent;
+
+                    // Pulsing accent bar
+                    Rectangle {
+                        x: 0;
+                        width: 4px;
+                        height: parent.height;
+                        background: Theme.accent;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        spacing: 12px;
+                        alignment: center;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 26px;
+                                height: 26px;
+                                border-radius: 13px;
+                                background: Theme.accent-soft;
+                                border-width: 1px;
+                                border-color: Theme.accent;
+
+                                Icon {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    size: 14px;
+                                    glyph: Glyph.sparkle;
+                                    tint: Theme.accent;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 3px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text {
+                                    text: "Procesando con Gemini AI";
+                                    font-family: Theme.font;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: Theme.fg;
+                                    vertical-alignment: center;
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 16px;
+                                        border-radius: Theme.r-sm;
+                                        background: #f59e0b22;
+                                        border-width: 1px;
+                                        border-color: #f59e0b66;
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            Text {
+                                                text: "⚡ EN CURSO";
+                                                font-family: Theme.font;
+                                                font-size: 8px;
+                                                font-weight: 700;
+                                                color: #fbbf24;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Text {
+                                text: root.status != "" ? root.status : "Razonando e interactuando con el proyecto...";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: Theme.fg-muted;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Quick Slash Commands Strip (Above Input) ──
+    Rectangle {
+        height: 32px;
+        background: Theme.panel;
+
+        // Top divider
+        Rectangle {
+            y: 0;
+            height: 1px;
+            background: Theme.line;
+        }
+
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 6px;
+                alignment: start;
+
+                // Chip 1: Silences
+                Rectangle {
+                    height: 22px;
+                    border-radius: 11px;
+                    background: root.busy ? Theme.well : (chip1-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.busy ? Theme.line : (chip1-touch.has-hover ? Theme.line-strong : Theme.line);
+
+                    chip1-touch := TouchArea {
+                        enabled: !root.busy;
+                        mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                        clicked => {
+                            input.text = "/silencios ";
+                            input.focus();
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon {
+                                    size: 11px;
+                                    glyph: Glyph.volume-off;
+                                    tint: root.busy ? Theme.fg-dim : Theme.accent;
+                                }
+                            }
+                            Text {
+                                text: "/silencios";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: root.busy ? Theme.fg-dim : Theme.fg;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Chip 2: Split
+                Rectangle {
+                    height: 22px;
+                    border-radius: 11px;
+                    background: root.busy ? Theme.well : (chip2-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.busy ? Theme.line : (chip2-touch.has-hover ? Theme.line-strong : Theme.line);
+
+                    chip2-touch := TouchArea {
+                        enabled: !root.busy;
+                        mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                        clicked => {
+                            input.text = "/dividir ";
+                            input.focus();
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon {
+                                    size: 11px;
+                                    glyph: Glyph.razor;
+                                    tint: root.busy ? Theme.fg-dim : #c084fc;
+                                }
+                            }
+                            Text {
+                                text: "/dividir";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: root.busy ? Theme.fg-dim : Theme.fg;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Chip 3: Subtitles
+                Rectangle {
+                    height: 22px;
+                    border-radius: 11px;
+                    background: root.busy ? Theme.well : (chip3-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.busy ? Theme.line : (chip3-touch.has-hover ? Theme.line-strong : Theme.line);
+
+                    chip3-touch := TouchArea {
+                        enabled: !root.busy;
+                        mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                        clicked => {
+                            input.text = "/subtítulos ";
+                            input.focus();
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon {
+                                    size: 11px;
+                                    glyph: Glyph.waveform;
+                                    tint: root.busy ? Theme.fg-dim : Theme.green;
+                                }
+                            }
+                            Text {
+                                text: "/subtítulos";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: root.busy ? Theme.fg-dim : Theme.fg;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Chip 4: Project Summary
+                Rectangle {
+                    height: 22px;
+                    border-radius: 11px;
+                    background: root.busy ? Theme.well : (chip4-touch.has-hover ? Theme.field-hover : Theme.field);
+                    border-width: 1px;
+                    border-color: root.busy ? Theme.line : (chip4-touch.has-hover ? Theme.line-strong : Theme.line);
+
+                    chip4-touch := TouchArea {
+                        enabled: !root.busy;
+                        mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                        clicked => {
+                            root.send-message("Haz un resumen completo del estado del proyecto actual.");
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon {
+                                    size: 11px;
+                                    glyph: Glyph.film;
+                                    tint: root.busy ? Theme.fg-dim : #fbbf24;
+                                }
+                            }
+                            Text {
+                                text: "/resumen";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: root.busy ? Theme.fg-dim : Theme.fg;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Antigravity IDE Signature Composer (Input Box) ──
+    Rectangle {
+        height: 122px;
+        background: Theme.panel;
+
+        // Elevated composer card with glowing focus ring
+        Rectangle {
+            x: 12px;
+            y: 8px;
+            width: parent.width - 24px;
+            height: parent.height - 16px;
+            background: root.busy ? Theme.well : Theme.field;
+            border-radius: Theme.r;
+            border-width: 1px;
+            border-color: root.busy ? Theme.line : (input.has-focus ? Theme.accent : (card-touch.has-hover ? Theme.line-strong : Theme.line));
+            clip: true;
+
+            // Clicking card background focuses the text field
+            card-touch := TouchArea {
+                enabled: !root.busy;
+                mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.text;
+                clicked => { if (!root.busy) { input.focus(); } }
+            }
+
+            // Placeholder (rendered before TextInput so it never blocks clicks)
+            if input.text == "" && !root.busy: Text {
+                x: 12px;
+                y: 10px;
+                width: parent.width - 24px;
+                text: "Pregunta o pide una edición (ej: 'corta los primeros 3s', '/silencios')...";
+                color: Theme.fg-dim;
+                font-family: Theme.font;
+                font-size: 12px;
+            }
+
+            // Main TextInput
+            input := TextInput {
+                x: 12px;
+                y: 10px;
+                width: parent.width - 24px;
+                height: parent.height - 46px;
+                enabled: !root.busy;
+                color: root.busy ? Theme.fg-dim : Theme.fg;
+                font-family: Theme.font;
+                font-size: 12px;
+                single-line: false;
+                wrap: word-wrap;
+                selection-background-color: Theme.accent;
+                selection-foreground-color: Theme.on-accent;
+
+                key-pressed(event) => {
+                    if (event.text == Key.Return) {
+                        if (!root.busy && self.text != "") {
+                            root.send-message(self.text);
+                            self.text = "";
+                        }
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
+
+            // Overlay when busy blocking all clicks and displaying status
+            if root.busy: Rectangle {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height - 34px;
+                background: Theme.panel.with-alpha(0.92);
+
+                TouchArea {
+                    mouse-cursor: MouseCursor.not-allowed;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            size: 13px;
+                            glyph: Glyph.lock;
+                            tint: Theme.accent;
+                        }
+                    }
+                    Text {
+                        text: "Procesando solicitud... El chat está bloqueado temporalmente";
+                        font-family: Theme.font;
+                        font-size: 11px;
+                        font-weight: 500;
+                        color: Theme.accent;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // Bottom toolbar inside composer card
+            Rectangle {
+                x: 0;
+                y: parent.height - 34px;
+                width: parent.width;
+                height: 34px;
+                background: Theme.panel;
+
+                // 1px inner divider
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Theme.line;
+                }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: space-between;
+
+                    // Left: Mode switch pill & Model badge
+                    VerticalLayout {
+                        alignment: center;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            Rectangle {
+                                height: 22px;
+                                border-radius: Theme.r-sm;
+                                background: root.autonomous ? Theme.accent-soft : Theme.field;
+                                border-width: 1px;
+                                border-color: root.autonomous ? Theme.accent : Theme.line;
+
+                                TouchArea {
+                                    enabled: !root.busy;
+                                    mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                                    clicked => { if (!root.busy) { root.mode-changed(!root.autonomous); } }
+
+                                    HorizontalLayout {
+                                        padding-left: 7px;
+                                        padding-right: 7px;
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Text {
+                                            text: root.autonomous ? "⚡ Modo Autónomo" : "🧠 Modo Copiloto";
+                                            font-family: Theme.font;
+                                            font-size: 10px;
+                                            font-weight: 600;
+                                            color: root.busy ? Theme.fg-dim : (root.autonomous ? Theme.accent : Theme.fg);
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Model Selector Pill (Interactive in position 3)
+                            model-btn := Rectangle {
+                                height: 22px;
+                                border-radius: Theme.r-sm;
+                                background: model-touch.has-hover ? Theme.field-hover : Theme.field;
+                                border-width: 1px;
+                                border-color: model-touch.has-hover ? Theme.line-strong : Theme.line;
+
+                                animate background, border-color { duration: 120ms; }
+
+                                model-touch := TouchArea {
+                                    enabled: !root.busy;
+                                    mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                                    clicked => {
+                                        if (!root.busy) {
+                                            root.model-changed(root.model-name == "gemini-3.5-flash" ? "gemini-pro-latest" : "gemini-3.5-flash");
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 7px;
+                                        padding-right: 7px;
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Text {
+                                            text: root.model-name;
+                                            font-family: Theme.font;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: root.busy ? Theme.fg-dim : (model-touch.has-hover ? Theme.fg : Theme.accent);
+                                            vertical-alignment: center;
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Icon {
+                                                size: 8px;
+                                                glyph: Glyph.chevron-down;
+                                                tint: root.busy ? Theme.fg-dim : Theme.accent;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Right: Send button & shortcut hint
+                    VerticalLayout {
+                        alignment: center;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: end;
+
+                            Text {
+                                text: root.busy ? "Bloqueado" : "↵ Enter";
+                                font-family: Theme.font;
+                                font-size: 10px;
+                                color: root.busy ? Theme.accent : Theme.fg-dim;
+                                vertical-alignment: center;
+                            }
+
+                            // Send button
+                            Rectangle {
+                                width: 26px;
+                                height: 26px;
+                                border-radius: Theme.r-sm;
+                                background: (!root.busy && input.text != "") ? Theme.accent : Theme.field;
+                                border-width: 1px;
+                                border-color: (!root.busy && input.text != "") ? Theme.accent : Theme.line;
+
+                                TouchArea {
+                                    enabled: !root.busy;
+                                    mouse-cursor: root.busy ? MouseCursor.not-allowed : MouseCursor.pointer;
+                                    clicked => {
+                                        if (!root.busy && input.text != "") {
+                                            root.send-message(input.text);
+                                            input.text = "";
+                                        }
+                                    }
+
+                                    Icon {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        size: 13px;
+                                        glyph: Glyph.chevron-right;
+                                        tint: (!root.busy && input.text != "") ? Theme.on-accent : Theme.fg-dim;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Floating Assistant Drawer Panel (Right side, Antigravity IDE aesthetic) ──
+export component FloatingAssistantPanel inherits Rectangle {
+    background: Theme.panel;
+    border-radius: Theme.r-lg;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    clip: true;
+
+    in property <bool> autonomous: true;
+    in property <bool> logged-in: false;
+    in property <string> user-email: "";
+    in property <[AssistantMessageData]> messages: [];
+    in property <bool> busy: false;
+    in property <string> status: "";
+    in property <string> model-name: "gemini-3.5-flash";
+
+    callback close();
+    callback mode-changed(bool);
+    callback login();
+    callback logout();
+    callback send-message(string);
+    callback approve-action(string);
+    callback reject-action(string);
+    callback clear();
+    callback model-changed(string);
+
+    VerticalLayout {
+        // ── Antigravity IDE Agent Header ──
+        Rectangle {
+            height: 52px;
+            background: Theme.raised;
+
+            // Bottom border divider
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Theme.line;
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-top: 10px;
+                padding-bottom: 8px;
+                alignment: space-between;
+                spacing: 8px;
+
+                // Left: Logo
+                VerticalLayout {
+                    alignment: center;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        // Glowing Sparkle Avatar
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            border-radius: Theme.r-sm;
+                            background: Theme.accent;
+
+                            Icon {
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                                size: 14px;
+                                glyph: Glyph.sparkle;
+                                tint: Theme.on-accent;
+                            }
+                        }
+                    }
+                }
+
+                // Right: Clear + Google Auth + Close Button
+                VerticalLayout {
+                    alignment: center;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        // Clear session / New chat button
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            border-radius: Theme.r-sm;
+                            background: clear-touch.has-hover ? Theme.field-hover : Theme.field;
+                            border-width: 1px;
+                            border-color: Theme.line;
+
+                            clear-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.clear(); }
+
+                                Icon {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    size: 13px;
+                                    glyph: Glyph.plus;
+                                    tint: clear-touch.has-hover ? Theme.fg : Theme.fg-muted;
+                                }
+                            }
+                        }
+
+                        // Login / Account Pill
+                        Rectangle {
+                            height: 28px;
+                            border-radius: Theme.r-sm;
+                            background: root.logged-in ? Theme.field : Theme.accent;
+                            border-width: 1px;
+                            border-color: root.logged-in ? Theme.line : Theme.accent;
+
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if (root.logged-in) {
+                                        root.logout();
+                                    } else {
+                                        root.login();
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 6px;
+                                    alignment: center;
+
+                                    // Online dot when logged in
+                                    if root.logged-in: VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 7px;
+                                            height: 7px;
+                                            border-radius: 3.5px;
+                                            background: Theme.green;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.logged-in ?
+                                            (root.user-email != "" ? root.user-email : "Conectado") :
+                                            "Iniciar sesión";
+                                        font-family: Theme.font;
+                                        font-size: 11px;
+                                        font-weight: root.logged-in ? 500 : 700;
+                                        color: root.logged-in ? Theme.fg : Theme.on-accent;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Close X Button
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            border-radius: Theme.r-sm;
+                            background: close-touch.has-hover ? Theme.field-hover : Theme.field;
+                            border-width: 1px;
+                            border-color: Theme.line;
+
+                            close-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.close(); }
+
+                                Icon {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    size: 12px;
+                                    glyph: Glyph.close;
+                                    tint: close-touch.has-hover ? Theme.fg : Theme.fg-muted;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Context Sub-strip (Status line) ──
+        Rectangle {
+            height: 24px;
+            background: Theme.panel;
+
+            // Bottom border divider
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Theme.line;
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Theme.green;
+                        }
+                    }
+
+                    Text {
+                        text: "Concat Workspace Activo · Modo " + (root.autonomous ? "Autónomo" : "Copiloto");
+                        font-family: Theme.font;
+                        font-size: 10px;
+                        color: Theme.fg-muted;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: root.autonomous ? "Edición directa" : "Aprobación manual";
+                    font-family: Theme.font;
+                    font-size: 9px;
+                    color: Theme.fg-dim;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // ── Main Chat Area ──
+        AssistantChatContent {
+            autonomous: root.autonomous;
+            logged-in: root.logged-in;
+            user-email: root.user-email;
+            messages: root.messages;
+            busy: root.busy;
+            status: root.status;
+            model-name: root.model-name;
+
+            send-message(msg) => { root.send-message(msg); }
+            approve-action(id) => { root.approve-action(id); }
+            reject-action(id) => { root.reject-action(id); }
+            mode-changed(autonomous) => { root.mode-changed(autonomous); }
+            login => { root.login(); }
+            model-changed(m) => { root.model-changed(m); }
+        }
+    }
+}
+
+// ── Standard Seat AssistantPane (for backward compatibility in workspace seats) ──
+export component AssistantPane inherits Pane {
+    in property <int> pane-seat;
+    in property <bool> pane-removable;
+    callback pane-picked(kind: PaneKind);
+    callback pane-removed();
+
+    in property <bool> autonomous: true;
+    in property <bool> logged-in: false;
+    in property <string> user-email: "";
+    in property <[AssistantMessageData]> messages: [];
+    in property <bool> busy: false;
+    in property <string> status: "";
+    in property <string> model-name: "gemini-3.5-flash";
+
+    callback mode-changed(bool);
+    callback login();
+    callback logout();
+    callback send-message(string);
+    callback approve-action(string);
+    callback reject-action(string);
+    callback clear();
+    callback model-changed(string);
+
+    VerticalLayout {
+        PaneHeader {
+            HorizontalLayout {
+                alignment: space-between;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    PaneSwitcher {
+                        kind: PaneKind.assistant;
+                        removable: root.pane-removable;
+                        picked(kind) => { root.pane-picked(kind); }
+                        removed => { root.pane-removed(); }
+                    }
+
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        background: Theme.accent;
+                        border-radius: Theme.r-sm;
+
+                        Icon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            size: 12px;
+                            glyph: Glyph.sparkle;
+                            tint: Theme.on-accent;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 6px;
+                        background: root.autonomous ? #6366f122 : Theme.field;
+                        border-width: 1px;
+                        border-color: root.autonomous ? #6366f188 : Theme.line;
+
+                        TouchArea {
+                            clicked => { root.mode-changed(!root.autonomous); }
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                Text {
+                                    text: root.autonomous ? "⚡ Autónomo" : "🧠 Copiloto";
+                                    font-size: 11px;
+                                    color: root.autonomous ? #818cf8 : Theme.fg-dim;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 6px;
+                        background: root.logged-in ? Theme.field : #6366f1;
+                        border-width: 1px;
+                        border-color: root.logged-in ? Theme.line : #818cf8;
+
+                        TouchArea {
+                            clicked => {
+                                if (root.logged-in) {
+                                    root.logout();
+                                } else {
+                                    root.login();
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text {
+                                    text: root.logged-in ?
+                                        (root.user-email != "" ? root.user-email : "Conectado") :
+                                        "Iniciar sesión";
+                                    font-size: 11px;
+                                    font-weight: root.logged-in ? 400 : 700;
+                                    color: root.logged-in ? Theme.fg : #ffffff;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AssistantChatContent {
+            autonomous: root.autonomous;
+            logged-in: root.logged-in;
+            user-email: root.user-email;
+            messages: root.messages;
+            busy: root.busy;
+            status: root.status;
+            model-name: root.model-name;
+
+            send-message(msg) => { root.send-message(msg); }
+            approve-action(id) => { root.approve-action(id); }
+            reject-action(id) => { root.reject-action(id); }
+            mode-changed(autonomous) => { root.mode-changed(autonomous); }
+            login => { root.login(); }
+            model-changed(m) => { root.model-changed(m); }
+        }
+    }
+}

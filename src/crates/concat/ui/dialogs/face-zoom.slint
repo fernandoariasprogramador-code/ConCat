@@ -1,0 +1,491 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
+
+import { I18n } from "../i18n.slint";
+import { Theme } from "../theme/theme.slint";
+import { Glyph, Icon } from "../icons.slint";
+import { Button, DialogRow, DialogSection, Modal } from "../primitives/modal.slint";
+import { SegmentedControl } from "../primitives/segmented-control.slint";
+
+export struct DetectedFaceData {
+    id: int,
+    label: string,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    selected: bool,
+}
+
+export struct FaceZoomData {
+    open: bool,
+    clip-id: string,
+    clip-name: string,
+    photo: image,
+    has-photo: bool,
+    photo-width: float,
+    photo-height: float,
+    // Target position in photo (0..1 normalized)
+    target-x: float,
+    target-y: float,
+    // Zoom scale factor (e.g. 1.8)
+    zoom: float,
+    // Direction: 0 = Zoom In, 1 = Zoom Out
+    direction: int,
+    // Easing: 0 = Cinematic (Ease Out), 1 = Linear, 2 = Ease In-Out
+    easing: int,
+    // Detected faces in the image
+    faces: [DetectedFaceData],
+    has-faces: bool,
+    selected-face: int,
+    is-cached: bool,
+    analyzing: bool,
+}
+
+component PresetChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+
+    height: 26px;
+    horizontal-stretch: 1;
+    border-radius: Theme.r-sm;
+    background: root.active ? Theme.accent : touch.has-hover ? Theme.field-hover : Theme.field;
+    border-width: 1px;
+    border-color: root.active ? Theme.accent : Theme.line;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: root.text;
+        color: root.active ? Theme.on-accent : Theme.fg;
+        font-size: Theme.fs-sm;
+        font-weight: root.active ? Theme.weight-title : Theme.weight-body;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+    }
+}
+
+export component FaceZoomDialog inherits Modal {
+    in property <FaceZoomData> data;
+
+    callback dismissed();
+    callback target-changed(float, float);
+    callback zoom-changed(float);
+    callback direction-changed(int);
+    callback easing-changed(int);
+    callback face-selected(int);
+    callback apply();
+
+    open: root.data.open;
+    title: "Zoom al Rostro (Efecto Ken Burns)";
+    glyph: Glyph.maximize;
+    surface-width: 620px;
+
+    closed => { root.dismissed(); }
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 16px;
+
+        // ── 1. Visor de la foto con retículo de encuadre ──
+        DialogSection {
+            first: true;
+            title: "1. Ubicación del Rostro";
+
+            canvas := Rectangle {
+                height: 300px;
+                background: Theme.well;
+                border-radius: Theme.r-lg;
+                border-width: 1px;
+                border-color: Theme.line-strong;
+                clip: true;
+
+                if !root.data.has-photo: Text {
+                    text: "Vista previa del clip actual";
+                    color: Theme.fg-muted;
+                    font-size: Theme.fs;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+
+                // Cálculo exacto del rectángulo donde la foto se dibuja (sin los bordes negros)
+                property <float> pw: root.data.photo-width > 0 ? root.data.photo-width : 16.0;
+                property <float> ph: root.data.photo-height > 0 ? root.data.photo-height : 9.0;
+                property <float> scale: Math.min(parent.width / (self.pw * 1px), parent.height / (self.ph * 1px));
+                property <length> disp-w: self.pw * 1px * self.scale;
+                property <length> disp-h: self.ph * 1px * self.scale;
+                property <length> disp-x: (parent.width - self.disp-w) / 2;
+                property <length> disp-y: (parent.height - self.disp-h) / 2;
+
+                if root.data.has-photo: photo-container := Rectangle {
+                    x: canvas.disp-x;
+                    y: canvas.disp-y;
+                    width: canvas.disp-w;
+                    height: canvas.disp-h;
+
+                    Image {
+                        width: 100%;
+                        height: 100%;
+                        source: root.data.photo;
+                        image-fit: fill;
+                    }
+
+                    // Recuadro que muestra exactamente el encuadre final con zoom dentro de la foto
+                    property <length> box-w: photo-container.width / Math.max(root.data.zoom, 1.0);
+                    property <length> box-h: photo-container.height / Math.max(root.data.zoom, 1.0);
+                    property <length> box-x: Math.clamp(root.data.target-x * photo-container.width - self.box-w / 2, 0px, photo-container.width - self.box-w);
+                    property <length> box-y: Math.clamp(root.data.target-y * photo-container.height - self.box-h / 2, 0px, photo-container.height - self.box-h);
+
+                    Rectangle {
+                        x: photo-container.box-x;
+                        y: photo-container.box-y;
+                        width: photo-container.box-w;
+                        height: photo-container.box-h;
+                        border-width: 2px;
+                        border-color: Theme.accent;
+                        border-radius: Theme.r-sm;
+                        background: Theme.accent-soft;
+                    }
+
+                    // Marcador diana / retículo central sobre la cara
+                    target-point := Rectangle {
+                        x: Math.clamp(root.data.target-x * photo-container.width - 12px, 0px, photo-container.width - 24px);
+                        y: Math.clamp(root.data.target-y * photo-container.height - 12px, 0px, photo-container.height - 24px);
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        border-width: 2px;
+                        border-color: Theme.accent;
+
+                        Rectangle {
+                            x: 9px;
+                            y: 9px;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Theme.accent;
+                        }
+                    }
+
+                    // Etiqueta indicadora
+                    Rectangle {
+                        x: Math.clamp(root.data.target-x * photo-container.width - 45px, 6px, photo-container.width - 96px);
+                        y: Math.clamp(root.data.target-y * photo-container.height - 34px, 6px, photo-container.height - 26px);
+                        height: 18px;
+                        width: 90px;
+                        border-radius: Theme.r-xs;
+                        background: Theme.panel;
+                        border-width: 1px;
+                        border-color: Theme.accent;
+
+                        Text {
+                            text: "Rostro objetivo";
+                            font-size: Theme.fs-xs;
+                            font-weight: Theme.weight-title;
+                            color: Theme.fg-hot;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    // TouchArea interactiva exactamente sobre la imagen sin desfasajes
+                    touch := TouchArea {
+                        clicked => {
+                            root.target-changed(
+                                Math.clamp(touch.mouse-x / photo-container.width, 0.05, 0.95),
+                                Math.clamp(touch.mouse-y / photo-container.height, 0.05, 0.95)
+                            );
+                        }
+                        moved => {
+                            if (self.pressed) {
+                                root.target-changed(
+                                    Math.clamp(touch.mouse-x / photo-container.width, 0.05, 0.95),
+                                    Math.clamp(touch.mouse-y / photo-container.height, 0.05, 0.95)
+                                );
+                            }
+                        }
+                    }
+
+                    // Cartel elegante de carga mientras se analizan los rostros
+                    if root.data.analyzing: Rectangle {
+                        x: (photo-container.width - 210px) / 2;
+                        y: 12px;
+                        width: 210px;
+                        height: 34px;
+                        border-radius: 17px;
+                        background: #14151ae8;
+                        border-width: 1px;
+                        border-color: Theme.accent;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            padding-left: 12px;
+                            padding-right: 12px;
+
+                            Rectangle {
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 9px;
+                                background: Theme.accent-soft;
+
+                                Icon {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    size: 11px;
+                                    glyph: Glyph.search;
+                                    tint: Theme.accent;
+                                }
+                            }
+
+                            Text {
+                                text: "Analizando rostros...";
+                                font-size: Theme.fs-sm;
+                                font-weight: Theme.weight-title;
+                                color: Theme.fg-hot;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Recuadros de cada rostro detectado en la foto
+                    for face[idx] in root.data.faces: Rectangle {
+                        x: face.x * photo-container.width;
+                        y: face.y * photo-container.height;
+                        width: face.w * photo-container.width;
+                        height: face.h * photo-container.height;
+                        border-width: face.selected ? 2px : 1px;
+                        border-color: face.selected ? Theme.accent : #ffffff90;
+                        border-radius: Theme.r-xs;
+                        background: face.selected ? Theme.accent-soft : #ffffff15;
+
+                        // Etiqueta del rostro
+                        Rectangle {
+                            x: 2px;
+                            y: -18px;
+                            height: 16px;
+                            width: 58px;
+                            border-radius: Theme.r-xs;
+                            background: face.selected ? Theme.accent : Theme.panel;
+                            border-width: 1px;
+                            border-color: face.selected ? Theme.accent : Theme.line;
+
+                            Text {
+                                text: face.label;
+                                font-size: Theme.fs-xs;
+                                font-weight: Theme.weight-title;
+                                color: face.selected ? Theme.on-accent : Theme.fg;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.face-selected(face.id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if root.data.analyzing: HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                padding-top: 2px;
+
+                Icon {
+                    glyph: Glyph.search;
+                    size: 14px;
+                    tint: Theme.accent;
+                }
+                Text {
+                    text: "Buscando rostros en la foto automáticamente...";
+                    font-size: Theme.fs-sm;
+                    color: Theme.accent;
+                    font-weight: Theme.weight-title;
+                    vertical-alignment: center;
+                }
+            }
+
+            if !root.data.analyzing && root.data.has-faces: HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                padding-top: 2px;
+
+                Text {
+                    text: root.data.is-cached ? "Rostros (Caché):" : "Rostros detectados:";
+                    font-size: Theme.fs-sm;
+                    font-weight: Theme.weight-title;
+                    color: Theme.fg;
+                    vertical-alignment: center;
+                }
+
+                for face in root.data.faces: PresetChip {
+                    text: face.label;
+                    active: face.selected;
+                    clicked => { root.face-selected(face.id); }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Icon {
+                    glyph: Glyph.frame;
+                    size: 13px;
+                    tint: Theme.accent;
+                }
+                Text {
+                    text: root.data.analyzing
+                        ? "Por favor espera un instante mientras termina de analizar los rostros..."
+                        : root.data.has-faces
+                            ? "Haz clic sobre un rostro para centrarlo, o arrastra libremente para personalizar."
+                            : "Haz clic o arrastra en la foto para apuntar directamente al rostro de la persona.";
+                    font-size: Theme.fs-sm;
+                    color: Theme.fg-muted;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // ── 2. Dirección del Zoom ──
+        DialogSection {
+            title: "2. Dirección del Efecto";
+
+            SegmentedControl {
+                options: [
+                    "🔍 Zoom In (Acercar al rostro)",
+                    "🔍 Zoom Out (Alejar de rostro a foto)"
+                ];
+                current: root.data.direction;
+                changed(idx) => { root.direction-changed(idx); }
+            }
+
+            Rectangle {
+                background: Theme.field;
+                border-radius: Theme.r;
+                border-width: 1px;
+                border-color: Theme.line;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    spacing: 8px;
+
+                    Icon {
+                        glyph: Glyph.frame;
+                        size: 14px;
+                        tint: Theme.accent;
+                    }
+
+                    Text {
+                        text: root.data.direction == 0
+                            ? "Zoom In: La foto inicia mostrándose completa (100%) y la cámara se acerca de forma cinematográfica hacia el rostro seleccionado."
+                            : "Zoom Out: La toma inicia en primer plano sobre el rostro seleccionado y la cámara se aleja gradualmente hasta revelar la foto completa.";
+                        font-size: Theme.fs-sm;
+                        color: Theme.fg-muted;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // ── 3. Ajustes de Escala y Curva ──
+        DialogSection {
+            title: "3. Ajustes de Movimiento";
+
+            HorizontalLayout {
+                spacing: 16px;
+
+                // Columna Izquierda: Nivel de Aumento
+                VerticalLayout {
+                    spacing: 6px;
+                    horizontal-stretch: 1;
+
+                    Text {
+                        text: "Nivel de Aumento (" + (Math.round(root.data.zoom * 10) / 10) + "x):";
+                        font-size: Theme.fs-sm;
+                        color: Theme.fg;
+                        font-weight: Theme.weight-title;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        PresetChip {
+                            text: "1.4x";
+                            active: Math.abs(root.data.zoom - 1.4) < 0.1;
+                            clicked => { root.zoom-changed(1.4); }
+                        }
+                        PresetChip {
+                            text: "1.8x";
+                            active: Math.abs(root.data.zoom - 1.8) < 0.1;
+                            clicked => { root.zoom-changed(1.8); }
+                        }
+                        PresetChip {
+                            text: "2.2x";
+                            active: Math.abs(root.data.zoom - 2.2) < 0.1;
+                            clicked => { root.zoom-changed(2.2); }
+                        }
+                        PresetChip {
+                            text: "2.8x";
+                            active: Math.abs(root.data.zoom - 2.8) < 0.1;
+                            clicked => { root.zoom-changed(2.8); }
+                        }
+                    }
+                }
+
+                // Columna Derecha: Curva / Easing
+                VerticalLayout {
+                    spacing: 6px;
+                    horizontal-stretch: 1;
+
+                    Text {
+                        text: "Curva de Aceleración:";
+                        font-size: Theme.fs-sm;
+                        color: Theme.fg;
+                        font-weight: Theme.weight-title;
+                    }
+
+                    SegmentedControl {
+                        options: [
+                            "Suave",
+                            "Lineal",
+                            "Acelerada"
+                        ];
+                        current: root.data.easing;
+                        changed(idx) => { root.easing-changed(idx); }
+                    }
+                }
+            }
+        }
+
+        // ── 4. Botones de Acción ──
+        HorizontalLayout {
+            alignment: end;
+            spacing: 10px;
+            padding-top: 4px;
+
+            Button {
+                label: I18n.t("common.cancel");
+                clicked => { root.dismissed(); }
+            }
+
+            Button {
+                primary: true;
+                large: true;
+                enabled: !root.data.analyzing;
+                label: root.data.analyzing
+                    ? "Analizando..."
+                    : (root.data.direction == 0 ? "Aplicar Zoom In" : "Aplicar Zoom Out");
+                clicked => { root.apply(); }
+            }
+        }
+    }
+}

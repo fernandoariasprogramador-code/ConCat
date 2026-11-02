@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 // Hanken Grotesk is bundled rather than assumed: a desktop binary should look
 // the same on a machine that has never installed it. It is published as one
@@ -19,167 +19,56 @@ import "../../concat-text/fonts/HankenGrotesk-Italic.ttf";
 import { Theme } from "theme/theme.slint";
 import { Bezier, Curves, Fmt, Focus, Payload } from "util.slint";
 import { EffectData } from "demo/effects-panel.slint";
-import {
-    MediaFilter,
-    MediaItemData,
-    MediaKind,
-    SourcePreview,
-    TextPresetData,
-} from "workspace/media-pane.slint";
-import {
-    SoundCardData,
-    Sounds,
-    VoiceCardData,
-} from "workspace/audio-page.slint";
-import {
-    ContextMenu,
-    MenuItemData,
-    MenuRow,
-} from "primitives/context-menu.slint";
+import { MediaFilter, MediaItemData, MediaKind, SourcePreview, TextPresetData } from "workspace/media-pane.slint";
+import { ContextMenu, MenuItemData, MenuRow } from "primitives/context-menu.slint";
 import { ExportData, ExportDialog, ExportPhase } from "dialogs/export.slint";
-import {
-    ModelData,
-    SettingsData,
-    SettingsDialog,
-    SystemFactData,
-} from "dialogs/settings.slint";
+import { ModelData, SettingsData, SettingsDialog, SystemFactData } from "dialogs/settings.slint";
 import { ProjectDialog, ProjectSheetData } from "dialogs/project.slint";
-import {
-    RelinkDialog,
-    RelinkData,
-    MissingMediaItem,
-} from "dialogs/relink.slint";
+import { RelinkDialog, RelinkData, MissingMediaItem } from "dialogs/relink.slint";
 import { ConfirmData, ConfirmDialog } from "dialogs/confirm.slint";
 import { CaptionsDialog, CaptionsSheetData } from "dialogs/captions.slint";
 import { SpeechDialog, SpeechSheetData } from "dialogs/speech.slint";
-import { NewVoiceData, NewVoiceDialog } from "dialogs/new-voice.slint";
-import { AvatarData } from "primitives/avatar.slint";
-import { VoiceoverData, VoiceoverPanel } from "dialogs/voiceover.slint";
+import { FaceZoomData, FaceZoomDialog } from "dialogs/face-zoom.slint";
+import { AiExpandData, AiExpandDialog } from "dialogs/ai-expand.slint";
 import { DockDivider, DockSide, SeatBox } from "dock.slint";
 import { Editor } from "editor.slint";
+import { FloatingAssistantPanel } from "workspace/assistant-pane.slint";
+import { Glyph, Icon } from "icons.slint";
 import { PaneKind, Panes } from "workspace/pane-switcher.slint";
-import {
-    ChipOption,
-    NewProjectDialog,
-    RecentProjectData,
-    StartData,
-    StartScreen,
-} from "start.slint";
+import { ChipOption, NewProjectDialog, RecentProjectData, StartData, StartScreen } from "start.slint";
 import { TitleBar } from "title-bar.slint";
-import { PhoneEditor, PhoneSheets } from "phone/editor.slint";
+import { PhoneEditor } from "phone/editor.slint";
 import {
-    AppliedEntryData,
-    AppliedParamData,
-    CatalogueEntryData,
-    Library,
-    LibraryViewData,
-    TransitionChoiceData,
+    AppliedEntryData, AppliedParamData, CatalogueEntryData, Library, LibraryViewData,
 } from "inspector/clip-inspector.slint";
 import { ParamFormat } from "inspector/controls.slint";
 import { ToastData, ToastLayer } from "primitives/toast.slint";
 import { TooltipLayer } from "primitives/tooltip.slint";
 import { FontSearch } from "inspector/font-picker.slint";
-import { Meters } from "timeline/vu-meter.slint";
+import { Meters } from "workspace/meters-pane.slint";
 import { Workspace } from "workspace/workspace.slint";
 import {
-    Backdrop,
-    BackdropData,
-    ClipData,
-    ClipField,
-    ClipKeyData,
-    ClipKind,
-    ClipTextField,
-    DropData,
-    Keyframes,
-    SelectedClipData,
-    SelectedTransitionData,
-    StageGuideData,
-    StageItemData,
-    TextAlignment,
-    TimelineTabData,
-    TimelineTool,
-    TrackData,
-    TrackSize,
+    ClipData, ClipField, ClipKeyData, ClipKind, ClipTextField, DropData, Keyframes,
+    SelectedClipData, SelectedTransitionData, StageGuideData, StageItemData, TextAlignment, TimelineTabData,
+    TimelineTool, TrackData, TrackSize,
 } from "timeline/model.slint";
 
 // Re-exported so main.rs can reach the globals and the struct.
-import {
-    KeyEditor,
-    KeyMarkData,
-    KeyRowData,
-} from "workspace/keyframes-pane.slint";
-import { SpeedRamp } from "inspector/speed-ramp.slint";
+import { KeyEditor, KeyMarkData, KeyRowData } from "workspace/keyframes-pane.slint";
 
 export {
-    Curves,
-    Fmt,
-    Focus,
-    Payload,
-    Theme,
-    Bezier,
-    Editor,
-    I18n,
-    AppliedEntryData,
-    AppliedParamData,
-    CatalogueEntryData,
-    Library,
-    LibraryViewData,
-    ParamFormat,
-    TransitionChoiceData,
-    DockDivider,
-    DockSide,
-    PaneKind,
-    SeatBox,
-    EffectData,
-    FontSearch,
-    Meters,
-    MediaFilter,
-    MediaItemData,
-    MediaKind,
-    SourcePreview,
-    TextPresetData,
-    Backdrop,
-    BackdropData,
-    ClipData,
-    ClipField,
-    ClipKeyData,
-    ClipKind,
-    ClipTextField,
-    DropData,
-    Keyframes,
-    KeyEditor,
-    KeyMarkData,
-    KeyRowData,
-    SpeedRamp,
-    SelectedClipData,
-    SelectedTransitionData,
-    StageGuideData,
-    StageItemData,
-    TextAlignment,
-    TimelineTabData,
-    TimelineTool,
-    TrackData,
-    TrackSize,
-    MenuItemData,
-    MenuRow,
-    ExportData,
-    ExportPhase,
-    ModelData,
-    SettingsData,
-    ChipOption,
-    RecentProjectData,
-    StartData,
-    SystemFactData,
-    ToastData,
-    ProjectSheetData,
-    CaptionsSheetData,
-    SpeechSheetData,
-    VoiceoverData,
-    SoundCardData,
-    Sounds,
-    VoiceCardData,
-    NewVoiceData,
+    Curves, Fmt, Focus, Payload, Theme, Bezier, Editor, I18n,
+    AppliedEntryData, AppliedParamData, CatalogueEntryData, Library, LibraryViewData, ParamFormat,
+    DockDivider, DockSide, PaneKind, SeatBox,
+    EffectData, FontSearch, Meters, MediaFilter, MediaItemData, MediaKind, SourcePreview, TextPresetData,
+    ClipData, ClipField, ClipKeyData, ClipKind, ClipTextField, DropData, Keyframes,
+    KeyEditor, KeyMarkData, KeyRowData,
+    SelectedClipData, SelectedTransitionData, StageGuideData, StageItemData, TextAlignment, TimelineTabData,
+    TimelineTool, TrackData, TrackSize, MenuItemData, MenuRow, ExportData, ExportPhase, ModelData, SettingsData,
+    ChipOption, RecentProjectData, StartData, SystemFactData, ToastData, ProjectSheetData,
+    CaptionsSheetData, SpeechSheetData,
 }
+
 export component App inherits Window {
     title: "Concat";
     // The taskbar's and Alt-Tab's picture on Windows, and the window
@@ -232,7 +121,7 @@ export component App inherits Window {
     }
     property <bool> sheet-open: root.export.open || root.settings.open
         || root.project-sheet.open || root.captions.open || root.speech.open
-        || root.start.composing || root.new-voice.open;
+        || root.start.composing;
     changed sheet-open => {
         if (!root.sheet-open) {
             keys.focus();
@@ -268,25 +157,12 @@ export component App inherits Window {
     callback start-custom-width-edited(width: float);
     callback start-custom-height-edited(height: float);
     callback start-custom-fps-edited(fps: float);
-    callback start-canvas-changed(value: color);
     callback start-create();
     /// Open a project that already exists, picked from disk.
     callback start-open();
     callback start-open-recent(path: string);
     callback start-forget-recent(path: string);
-    callback start-reveal-recent(path: string);
-    callback start-search-edited(query: string);
-    callback start-sort-changed(sort: int);
-    /// One of the launch screen's links, by name; see `start::link`.
-    callback start-link(name: string);
     callback start-dismiss-error();
-    /// How many projects the recents list holds, before the search: the
-    /// grid's search and sort come up past a page of them.
-    in property <int> recents-total;
-    /// "0.2.7", for the launch screen's version line.
-    in property <string> app-version;
-    /// A file can be dragged in from the system: a desk, not a phone.
-    in property <bool> can-drop;
 
     // Title bar. The drag/maximize pair must be handled in main.rs — a window
     // cannot drag itself from inside the scene graph; the rest are seams like
@@ -303,9 +179,6 @@ export component App inherits Window {
     /// area, on a phone and in any window too narrow for it to float as a
     /// card with room around it.
     property <bool> sheets-fill: root.phone || root.width < 600px;
-    /// Which floating tool card is in front: "captions" or "speech". The
-    /// one opened or grabbed last; Escape closes it first.
-    property <string> front-tool: "captions";
 
     /// The File / Edit / View menus. Built in Rust like every other menu here,
     /// because what belongs on them depends on the project.
@@ -380,7 +253,6 @@ export component App inherits Window {
     callback settings-scale-changed(index: int);
     callback settings-playhead-stops-changed(on: bool);
     callback settings-proxies-changed(on: bool);
-    callback settings-gpu-changed(on: bool);
     callback settings-magnetic-changed(on: bool);
     callback settings-download-source-changed(index: int);
     callback settings-download-base-edited(text: string);
@@ -393,17 +265,10 @@ export component App inherits Window {
     callback settings-version-chosen(index: int);
     callback settings-install-version();
     callback settings-install-cancel();
-    /// The Shortcuts page: a row asked to capture the next keys, and the
-    /// two ways out of a change — put one row back, or put them all back.
-    callback settings-shortcut-capture(id: string);
-    callback settings-shortcut-reset(id: string);
-    callback settings-shortcut-reset-all();
     callback model-activated(id: string);
     callback model-download(id: string);
     callback model-cancel(id: string);
     callback model-remove(id: string);
-    callback model-open-link(id: string);
-    callback model-choose-file(id: string);
 
     callback open-settings();
     callback export-clicked();
@@ -418,7 +283,6 @@ export component App inherits Window {
     callback project-custom-height-edited(height: float);
     callback project-custom-fps-edited(fps: float);
     callback project-color-space-changed(index: int);
-    callback project-canvas-changed(value: color);
     callback project-apply();
 
     /// The two speech sheets: captions from a clip's sound, and a title's
@@ -435,16 +299,12 @@ export component App inherits Window {
     callback captions-size-changed(index: int);
     callback captions-begin();
     callback captions-cancel();
-    callback captions-import-srt();
-    callback captions-export-srt();
 
     in property <SpeechSheetData> speech;
     in property <[string]> speech-models;
     in property <[string]> speech-model-details;
     in property <[string]> speech-voices;
     in property <[string]> speech-voice-details;
-    /// Each voice's avatar; see Avatar.
-    in property <[AvatarData]> speech-voice-avatars;
     /// The recordings in the bin a voice can be taken from: their names,
     /// their waveforms as path commands, and their lengths.
     in property <[string]> speech-samples;
@@ -464,33 +324,23 @@ export component App inherits Window {
     pure callback speech-insert-tag(text: string, tag: string, at: int) -> string;
     callback speech-begin();
     callback speech-cancel();
-    callback speech-save-name-edited(name: string);
-    callback speech-pick-picture();
-    callback speech-save-voice();
-    callback speech-clear-style();
 
-    /// The Voices shelf's New voice sheet: a recording picked to be kept
-    /// as a voice; see NewVoiceDialog.
-    in property <NewVoiceData> new-voice;
-    callback new-voice-closed();
-    callback new-voice-name-edited(name: string);
-    callback new-voice-description-edited(text: string);
-    callback new-voice-start-changed(seconds: float);
-    callback new-voice-pick-picture();
-    callback new-voice-save();
+    in property <FaceZoomData> face-zoom;
+    callback face-zoom-closed();
+    callback face-zoom-target-changed(float, float);
+    callback face-zoom-zoom-changed(float);
+    callback face-zoom-direction-changed(int);
+    callback face-zoom-easing-changed(int);
+    callback face-zoom-face-selected(int);
+    callback face-zoom-apply();
 
-    /// The voiceover panel; see VoiceoverPanel. Its meter and clock come
-    /// on the Editor global, from a timer.
-    in property <VoiceoverData> voiceover;
-    in property <[string]> voiceover-devices;
-    callback voiceover-closed();
-    callback voiceover-action(verb: string);
-    callback voiceover-device-changed(index: int);
-    callback voiceover-countdown-changed(on: bool);
-    callback voiceover-mute-changed(on: bool);
-    callback voiceover-gain-changed(db: float);
-    callback voiceover-prompt-edited(text: string);
-    callback voiceover-prompt-speed-changed(index: int);
+    in property <AiExpandData> ai-expand;
+    callback ai-expand-closed();
+    callback ai-expand-prompt-changed(string);
+    callback ai-expand-generate();
+    callback ai-expand-restore-original();
+    callback ai-expand-fill-mode-changed(int);
+    callback ai-expand-feather-changed(int);
 
     /// Takes focus back from whatever field holds it. The keyboard scope is
     /// where focus rests when nothing is being typed into, so giving it the
@@ -556,42 +406,56 @@ export component App inherits Window {
     // remaps it to ⌘ on macOS and leaves it Ctrl on Windows and Linux, and
     // the menu row beside it is written from the same keys (platform.rs,
     // `keys`), so what a row says is what works on the machine it is on.
-    //
-    // What still lives in bindings here is the window's own: the menu
-    // bar's F10 and Alt+F/E/V, and opening, closing and quitting. A
-    // binding on this scope is matched before `key-pressed` below runs,
-    // so these hold their keys whatever the keymap says — which is why
-    // Settings › Shortcuts turns those chords away rather than letting a
-    // row claim a key that would not answer to it. Every other shortcut
-    // is one table in Rust now (src/keymap.rs), rebindable there and
-    // reached through `key-pressed`.
+    // Bindings rather than letters compared in `key-pressed`: a binding
+    // matches whatever the case, so Caps Lock does not turn every chord off.
     keys := FocusScope {
         width: 100%;
         height: 100%;
         focus-on-tab-navigation: false;
 
-        // The editor's chords were bound here, one KeyBinding apiece —
-        // save, undo, redo, split, copy and the rest. They are the
-        // keymap's now: a person moves one in Settings › Shortcuts, and
-        // the key, the menu row's label and the dispatch all follow it.
+        // Through the menu's own callback rather than a second handler: a
+        // shortcut and the row that advertises it have to do the same thing,
+        // and the cheapest way to be sure of that is for there to be one
+        // thing. Every other row in those menus is a KeyBinding away from
+        // working the same way.
+        KeyBinding {
+            keys: @keys(Control + S);
+            // Nothing on the launch screen has a project to act on, which is
+            // why the strip up there is missing the menus this belongs to.
+            enabled: !root.on-start;
+            activated => { root.app-menu-selected("save"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Z);
+            enabled: !root.on-start;
+            activated => { root.app-menu-selected("undo"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Shift + Z);
+            enabled: !root.on-start;
+            activated => { root.app-menu-selected("redo"); }
+        }
+        // Windows and Linux redo on Ctrl+Y as well; on a Mac ⌘Y is not redo.
+        KeyBinding {
+            keys: @keys(Control + Y);
+            enabled: !root.on-start && !root.macos;
+            activated => { root.app-menu-selected("redo"); }
+        }
         KeyBinding {
             keys: @keys(F10);
             enabled: !root.on-start && !root.macos && !root.phone;
             activated => { root.open-menu-from-keys(0); }
         }
-
         KeyBinding {
             keys: @keys(Alt + F);
             enabled: !root.on-start && !root.macos && !root.phone;
             activated => { root.open-menu-from-keys(0); }
         }
-
         KeyBinding {
             keys: @keys(Alt + E);
             enabled: !root.on-start && !root.macos && !root.phone;
             activated => { root.open-menu-from-keys(1); }
         }
-
         KeyBinding {
             keys: @keys(Alt + V);
             enabled: !root.on-start && !root.macos && !root.phone;
@@ -613,34 +477,90 @@ export component App inherits Window {
                 root.app-menu-selected(root.macos ? "close-window" : "close-project");
             }
         }
-
         KeyBinding {
             keys: @keys(Control + Q);
             enabled: !root.macos;
             activated => { root.app-menu-selected("close-window"); }
         }
-        // Everything the keymap owns lands here only when nothing else
-        // took it - a field being typed into consumes its own letters and
-        // spaces before a key can walk up to this scope, which is what
-        // keeps typing a title from cutting a clip, and the bindings above
-        // take theirs before this runs. The event crosses raw: the text
-        // and the modifier flags, because the chord, the action it names
-        // and where that dispatches are one table in Rust (keymap.rs),
-        // and the capture field in Settings > Shortcuts listens on this
-        // same callback. False lets the key go on up, so Escape still
-        // closes a popup and Tab still moves focus.
+        // The editor's chords, each the shortcut its menu row names.
+        KeyBinding {
+            keys: @keys(Control + B);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("split"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + A);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("select-all"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + C);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("copy"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + V);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("paste"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + D);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("duplicate"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + E);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("export"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + I);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("import"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + ",");
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("settings"); }
+        }
+        // Zoom in on = as well as +: they share a key on most layouts, and
+        // nobody reaches for Shift to zoom.
+        KeyBinding {
+            keys: @keys(Control + "=");
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("zoom-in"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Plus);
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("zoom-in"); }
+        }
+        KeyBinding {
+            keys: @keys(Control + "-");
+            enabled: !root.on-start;
+            activated => { Editor.shortcut("zoom-out"); }
+        }
+
+        // The rest of the keyboard, laid out the way every editor has
+        // taught its users: the chord key with a letter for an edit, a
+        // bare letter for a tool, the arrows and Home/End for the
+        // playhead. Every one lands here only when nothing else took it -
+        // a field being typed into consumes its own letters and spaces
+        // before a key can walk up to this scope, which is what keeps
+        // typing a title from cutting a clip.
         key-pressed(event) => {
             // Escape closes the sheet on top, as its × does. A sheet busy
             // with a job keeps itself - its × is gone then too - and the
             // key is spent on it, not passed to the editor underneath.
-            // Android's Back is the same key on a phone: unhandled, Slint
-            // finishes the activity, so Back with Export or a sheet open
-            // quit the app, a running export with it.
-            if (event.text == Key.Escape || event.text == Key.Back) {
+            if (event.text == Key.Escape) {
                 if (root.confirm.open) { root.confirm-dismissed(); return accept; }
                 if (root.relink.open) { root.relink-dismiss(); return accept; }
-                if (root.new-voice.open) {
-                    if (!root.new-voice.saving) { root.new-voice-closed(); }
+                if (root.speech.open) {
+                    if (!root.speech.running) { root.speech-closed(); }
+                    return accept;
+                }
+                if (root.captions.open) {
+                    if (!root.captions.running) { root.captions-closed(); }
                     return accept;
                 }
                 if (root.project-sheet.open) { root.project-closed(); return accept; }
@@ -653,45 +573,59 @@ export component App inherits Window {
                     if (!root.start.busy) { root.start-dismiss(); }
                     return accept;
                 }
-                // The tool cards, under the sheets: the one in front first.
-                // A floating card closes with its job running, which goes
-                // on and is there again when it is opened; a phone's sheet
-                // busy with a job keeps itself, as its × is gone.
-                if (root.speech.open && (root.front-tool == "speech" || !root.captions.open)) {
-                    if (!root.sheets-fill || !root.speech.running) { root.speech-closed(); }
-                    return accept;
-                }
-                if (root.captions.open) {
-                    if (!root.sheets-fill || !root.captions.running) { root.captions-closed(); }
-                    return accept;
-                }
-                // A look being shown over the picture, and nothing above it.
-                if (Editor.library-audition != "") {
-                    Editor.library-audition-filter(Editor.library-audition);
-                    return accept;
-                }
             }
-            // The phone editor's own sheet - Effects, Text, a clip's tools -
-            // comes down before Back leaves the project.
-            if ((event.text == Key.Back || event.text == Key.Escape) && root.phone && PhoneSheets.open) {
-                PhoneSheets.close-asked += 1;
-                return accept;
-            }
-            // Back with nothing on top: the editor saves and goes back to
-            // the launch screen, as a phone editor's Back returns to its
-            // projects. On the launch screen it goes on up, and Android
-            // leaves the app.
-            if (event.text == Key.Back) {
-                if (!root.on-start) {
-                    root.app-menu-selected("close-project");
-                    return accept;
-                }
+            if (root.on-start) {
                 return reject;
             }
-            if (Editor.key-chord(event.text, event.modifiers.shift, event.modifiers.alt,
-                    event.modifiers.control, event.modifiers.meta, root.on-start)) {
+            // A chord is the bindings' above; one they did not take is
+            // nobody's, and must not fall through to the bare letters
+            // below - Ctrl+H is not the hand.
+            if (event.modifiers.control || event.modifiers.meta) {
+                return reject;
+            }
+            if (event.modifiers.alt) {
+                return reject;
+            }
+            if (event.text == Key.Space) { Editor.play-toggled(); return accept; }
+            // Shift closes the gap the deletion leaves - the ripple delete
+            // of every other editor, on the key they all use for it.
+            // https://github.com/jub0t/Concat/issues/106
+            if (event.text == Key.Delete || event.text == Key.Backspace) {
+                if (event.modifiers.shift) {
+                    Editor.shortcut("ripple-delete");
+                } else {
+                    Editor.delete-selected();
+                }
                 return accept;
             }
+            if (event.text == Key.Home) { Editor.shortcut("start"); return accept; }
+            if (event.text == Key.End) { Editor.shortcut("end"); return accept; }
+            // A frame, or ten with shift.
+            if (event.text == Key.LeftArrow) {
+                Editor.step-frames(event.modifiers.shift ? -10 : -1);
+                return accept;
+            }
+            if (event.text == Key.RightArrow) {
+                Editor.step-frames(event.modifiers.shift ? 10 : 1);
+                return accept;
+            }
+            if (event.modifiers.shift) {
+                return reject;
+            }
+            // Lower-cased, so Caps Lock leaves the letters alone.
+            let letter = event.text.to-lowercase();
+            // B is the razor: the split tool, on and off, the key every
+            // editor cuts with. The chord B above splits at the playhead.
+            // https://github.com/jub0t/Concat/issues/241
+            if (letter == "b") { Editor.shortcut("split-tool"); return accept; }
+            if (letter == "n") { Editor.shortcut("snap"); return accept; }
+            if (letter == "s") { Editor.shortcut("preview-axis"); return accept; }
+            if (letter == "m") { Editor.shortcut("mute"); return accept; }
+            // H is the hand: the pan tool, on and off, the key every
+            // editor's canvas grabs with. It and J were the flips once;
+            // flipping is the inspector's and the clip menu's now, and J
+            // is free.
+            if (letter == "h") { Editor.shortcut("pan"); return accept; }
             return reject;
         }
 
@@ -745,23 +679,14 @@ export component App inherits Window {
                 vertical-stretch: 1;
 
                 recents: root.recents;
-                recents-total: root.recents-total;
-                query: root.start.query;
-                sort: root.start.sort;
                 busy: root.start.busy;
                 phone: root.phone;
-                version: root.app-version;
-                can-drop: root.can-drop;
 
                 compose => { root.start-compose(); }
                 open => { root.start-open(); }
                 open-settings => { root.open-settings(); }
                 open-recent(path) => { root.start-open-recent(path); }
                 forget-recent(path) => { root.start-forget-recent(path); }
-                reveal-recent(path) => { root.start-reveal-recent(path); }
-                search-edited(query) => { root.start-search-edited(query); }
-                sort-changed(sort) => { root.start-sort-changed(sort); }
-                link(name) => { root.start-link(name); }
             }
 
             // Everything the workspace shows now reads the Editor global, so
@@ -784,127 +709,6 @@ export component App inherits Window {
                 open-settings => { root.open-settings(); }
                 close-project => { root.app-menu-selected("close-project"); }
             }
-        }
-    }
-
-    // The voiceover panel floats over the editor and under every sheet:
-    // it has no scrim, so the work beside it carries on, and a sheet put up
-    // while it is open - Export, Settings - covers it like the rest.
-    if !root.on-start: VoiceoverPanel {
-        x: 0;
-        y: 0;
-        width: root.width;
-        height: root.height;
-        phone: root.phone;
-        inset-top: root.safe-area-insets.top;
-        inset-bottom: root.safe-area-insets.bottom;
-        inset-left: root.safe-area-insets.left;
-        inset-right: root.safe-area-insets.right;
-        data: root.voiceover;
-        devices: root.voiceover-devices;
-        level: Editor.record-level;
-        rms: Editor.record-rms;
-        clipped: Editor.record-clipped;
-        seconds: Editor.record-seconds;
-        silent: Editor.record-silent;
-
-        closed => { root.voiceover-closed(); }
-        action(verb) => { root.voiceover-action(verb); }
-        device-changed(index) => { root.voiceover-device-changed(index); }
-        countdown-changed(on) => { root.voiceover-countdown-changed(on); }
-        mute-changed(on) => { root.voiceover-mute-changed(on); }
-        gain-changed(db) => { root.voiceover-gain-changed(db); }
-        prompt-edited(text) => { root.voiceover-prompt-edited(text); }
-        prompt-speed-changed(index) => { root.voiceover-prompt-speed-changed(index); }
-    }
-
-    // Captions and Text to speech: cards floating over the editor on a
-    // desk, like the voiceover panel and under every sheet, so the
-    // timeline, the playhead and the selection stay in reach while they
-    // are open and a job runs. Whichever was opened or grabbed last is in
-    // front, and is the one Escape closes. On a phone, or a window too
-    // narrow for a card beside the work, they stay the sheets they were,
-    // over everything.
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: root.width;
-        height: root.height;
-        z: root.sheets-fill ? 1 : 0;
-
-        CaptionsDialog {
-            fill: root.sheets-fill;
-            floating: !root.sheets-fill;
-            z: root.front-tool == "captions" ? 1 : 0;
-            raised => { root.front-tool = "captions"; }
-            inset-top: root.safe-area-insets.top;
-            inset-bottom: root.safe-area-insets.bottom;
-            inset-left: root.safe-area-insets.left;
-            inset-right: root.safe-area-insets.right;
-            x: 0;
-            y: 0;
-            width: root.width;
-            height: root.height;
-            data: root.captions;
-            models: root.caption-models;
-
-            closed => { root.captions-closed(); }
-            voice-toggled(on) => { root.captions-voice-toggled(on); }
-            source-changed(index) => { root.captions-source-changed(index); }
-            text-edited(text) => { root.captions-text-edited(text); }
-            model-changed(index) => { root.captions-model-changed(index); }
-            placement-changed(index) => { root.captions-placement-changed(index); }
-            size-changed(index) => { root.captions-size-changed(index); }
-            begin => { root.captions-begin(); }
-            cancel => { root.captions-cancel(); }
-            import-srt => { root.captions-import-srt(); }
-            export-srt => { root.captions-export-srt(); }
-        }
-
-        SpeechDialog {
-            fill: root.sheets-fill;
-            floating: !root.sheets-fill;
-            // Its own home, a step in from the captions card's, so the two
-            // do not open exactly on top of each other.
-            home-right: 44px;
-            home-top: 76px;
-            z: root.front-tool == "speech" ? 1 : 0;
-            raised => { root.front-tool = "speech"; }
-            inset-top: root.safe-area-insets.top;
-            inset-bottom: root.safe-area-insets.bottom;
-            inset-left: root.safe-area-insets.left;
-            inset-right: root.safe-area-insets.right;
-            x: 0;
-            y: 0;
-            width: root.width;
-            height: root.height;
-            data: root.speech;
-            models: root.speech-models;
-            model-details: root.speech-model-details;
-            voices: root.speech-voices;
-            voice-details: root.speech-voice-details;
-            voice-avatars: root.speech-voice-avatars;
-            samples: root.speech-samples;
-            sample-waves: root.speech-sample-waves;
-            sample-details: root.speech-sample-details;
-
-            closed => { root.speech-closed(); }
-            text-edited(text) => { root.speech-text-edited(text); }
-            voice-changed(index) => { root.speech-voice-changed(index); }
-            model-changed(index) => { root.speech-model-changed(index); }
-            speed-changed(value) => { root.speech-speed-changed(value); }
-            quality-changed(index) => { root.speech-quality-changed(index); }
-            pauses-changed(value) => { root.speech-pauses-changed(value); }
-            reference-start-changed(seconds) => { root.speech-reference-start-changed(seconds); }
-            use-sample-changed(on) => { root.speech-use-sample-changed(on); }
-            sample-changed(index) => { root.speech-sample-changed(index); }
-            insert-tag(text, tag, at) => { return root.speech-insert-tag(text, tag, at); }
-            begin => { root.speech-begin(); }
-            cancel => { root.speech-cancel(); }
-            save-name-edited(name) => { root.speech-save-name-edited(name); }
-            pick-picture => { root.speech-pick-picture(); }
-            save-voice => { root.speech-save-voice(); }
-            clear-style => { root.speech-clear-style(); }
         }
     }
 
@@ -942,7 +746,6 @@ export component App inherits Window {
         custom-width-edited(width) => { root.start-custom-width-edited(width); }
         custom-height-edited(height) => { root.start-custom-height-edited(height); }
         custom-fps-edited(fps) => { root.start-custom-fps-edited(fps); }
-        canvas-changed(value) => { root.start-canvas-changed(value); }
         create => { root.start-create(); }
         dismiss-error => { root.start-dismiss-error(); }
     }
@@ -997,16 +800,9 @@ export component App inherits Window {
         languages: root.languages;
         system-facts: root.system-facts;
         system-report: root.system-report;
-        on-start: root.on-start;
 
-        // Focus hands itself back to the window's own scope, which is
-        // where the keymap listens and what the bindings above live on.
-        focus-keys => { keys.focus(); }
         closed => { root.settings-closed(); }
         page-changed(index) => { root.settings-page-changed(index); }
-        shortcut-capture(id) => { root.settings-shortcut-capture(id); }
-        shortcut-reset(id) => { root.settings-shortcut-reset(id); }
-        shortcut-reset-all => { root.settings-shortcut-reset-all(); }
         show-log => { root.settings-show-log(); }
         language-changed(index) => { root.settings-language-changed(index); }
         log-level-changed(index) => { root.settings-log-level-changed(index); }
@@ -1018,7 +814,6 @@ export component App inherits Window {
         scale-changed(index) => { root.settings-scale-changed(index); }
         playhead-stops-changed(on) => { root.settings-playhead-stops-changed(on); }
         proxies-changed(on) => { root.settings-proxies-changed(on); }
-        gpu-changed(on) => { root.settings-gpu-changed(on); }
         magnetic-changed(on) => { root.settings-magnetic-changed(on); }
         download-source-changed(index) => { root.settings-download-source-changed(index); }
         download-base-edited(text) => { root.settings-download-base-edited(text); }
@@ -1035,8 +830,6 @@ export component App inherits Window {
         model-download(id) => { root.model-download(id); }
         model-cancel(id) => { root.model-cancel(id); }
         model-remove(id) => { root.model-remove(id); }
-        model-open-link(id) => { root.model-open-link(id); }
-        model-choose-file(id) => { root.model-choose-file(id); }
     }
 
     in property <RelinkData> relink;
@@ -1063,30 +856,7 @@ export component App inherits Window {
         custom-height-edited(height) => { root.project-custom-height-edited(height); }
         custom-fps-edited(fps) => { root.project-custom-fps-edited(fps); }
         color-space-changed(index) => { root.project-color-space-changed(index); }
-        canvas-changed(value) => { root.project-canvas-changed(value); }
         apply => { root.project-apply(); }
-    }
-
-    // Over the Audio page it was opened from, and over the tool cards,
-    // which may be open beside the page on a desk.
-    NewVoiceDialog {
-        fill: root.sheets-fill;
-        inset-top: root.safe-area-insets.top;
-        inset-bottom: root.safe-area-insets.bottom;
-        inset-left: root.safe-area-insets.left;
-        inset-right: root.safe-area-insets.right;
-        x: 0;
-        y: 0;
-        width: root.width;
-        height: root.height;
-        data: root.new-voice;
-
-        closed => { root.new-voice-closed(); }
-        name-edited(name) => { root.new-voice-name-edited(name); }
-        description-edited(text) => { root.new-voice-description-edited(text); }
-        start-changed(seconds) => { root.new-voice-start-changed(seconds); }
-        pick-picture => { root.new-voice-pick-picture(); }
-        save => { root.new-voice-save(); }
     }
 
     RelinkDialog {
@@ -1118,6 +888,263 @@ export component App inherits Window {
         data: root.confirm;
         confirmed => { root.confirm-accepted(); }
         dismissed => { root.confirm-dismissed(); }
+    }
+
+
+    CaptionsDialog {
+        fill: root.sheets-fill;
+        inset-top: root.safe-area-insets.top;
+        inset-bottom: root.safe-area-insets.bottom;
+        inset-left: root.safe-area-insets.left;
+        inset-right: root.safe-area-insets.right;
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        data: root.captions;
+        models: root.caption-models;
+
+        closed => { root.captions-closed(); }
+        voice-toggled(on) => { root.captions-voice-toggled(on); }
+        source-changed(index) => { root.captions-source-changed(index); }
+        text-edited(text) => { root.captions-text-edited(text); }
+        model-changed(index) => { root.captions-model-changed(index); }
+        placement-changed(index) => { root.captions-placement-changed(index); }
+        size-changed(index) => { root.captions-size-changed(index); }
+        begin => { root.captions-begin(); }
+        cancel => { root.captions-cancel(); }
+    }
+
+    SpeechDialog {
+        fill: root.sheets-fill;
+        inset-top: root.safe-area-insets.top;
+        inset-bottom: root.safe-area-insets.bottom;
+        inset-left: root.safe-area-insets.left;
+        inset-right: root.safe-area-insets.right;
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        data: root.speech;
+        models: root.speech-models;
+        model-details: root.speech-model-details;
+        voices: root.speech-voices;
+        voice-details: root.speech-voice-details;
+        samples: root.speech-samples;
+        sample-waves: root.speech-sample-waves;
+        sample-details: root.speech-sample-details;
+
+        closed => { root.speech-closed(); }
+        text-edited(text) => { root.speech-text-edited(text); }
+        voice-changed(index) => { root.speech-voice-changed(index); }
+        model-changed(index) => { root.speech-model-changed(index); }
+        speed-changed(value) => { root.speech-speed-changed(value); }
+        quality-changed(index) => { root.speech-quality-changed(index); }
+        pauses-changed(value) => { root.speech-pauses-changed(value); }
+        reference-start-changed(seconds) => { root.speech-reference-start-changed(seconds); }
+        use-sample-changed(on) => { root.speech-use-sample-changed(on); }
+        sample-changed(index) => { root.speech-sample-changed(index); }
+        insert-tag(text, tag, at) => { return root.speech-insert-tag(text, tag, at); }
+        begin => { root.speech-begin(); }
+        cancel => { root.speech-cancel(); }
+    }
+
+    FaceZoomDialog {
+        fill: root.sheets-fill;
+        inset-top: root.safe-area-insets.top;
+        inset-bottom: root.safe-area-insets.bottom;
+        inset-left: root.safe-area-insets.left;
+        inset-right: root.safe-area-insets.right;
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        data: root.face-zoom;
+
+        dismissed => { root.face-zoom-closed(); }
+        target-changed(x, y) => { root.face-zoom-target-changed(x, y); }
+        zoom-changed(z) => { root.face-zoom-zoom-changed(z); }
+        direction-changed(d) => { root.face-zoom-direction-changed(d); }
+        easing-changed(e) => { root.face-zoom-easing-changed(e); }
+        face-selected(id) => { root.face-zoom-face-selected(id); }
+        apply => { root.face-zoom-apply(); }
+    }
+
+    AiExpandDialog {
+        fill: root.sheets-fill;
+        inset-top: root.safe-area-insets.top;
+        inset-bottom: root.safe-area-insets.bottom;
+        inset-left: root.safe-area-insets.left;
+        inset-right: root.safe-area-insets.right;
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        data: root.ai-expand;
+
+        dismissed => { root.ai-expand-closed(); }
+        prompt-changed(p) => { root.ai-expand-prompt-changed(p); }
+        generate => { root.ai-expand-generate(); }
+        restore-original => { root.ai-expand-restore-original(); }
+        fill-mode-changed(m) => { root.ai-expand-fill-mode-changed(m); }
+        feather-changed(f) => { root.ai-expand-feather-changed(f); }
+    }
+
+    // ── Gemini AI Floating Drawer (Right Side on Desktop / Responsive on Phone) ──
+    if !root.on-start && Editor.assistant-open: Rectangle {
+        width: root.phone ? (root.width - 24px) : Math.min(430px, root.width - 40px);
+        x: root.phone ? 12px : (root.width - self.width - 20px);
+        y: (root.phone ? 12px : 44px) + root.safe-area-insets.top;
+        height: root.phone
+            ? (root.height - 24px - 72px - root.safe-area-insets.top - root.safe-area-insets.bottom)
+            : (root.height - 44px - 84px - root.safe-area-insets.top - root.safe-area-insets.bottom);
+        border-radius: Theme.r-lg;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.line-strong;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000088;
+        drop-shadow-offset-y: 6px;
+        clip: true;
+
+        FloatingAssistantPanel {
+            width: 100%;
+            height: 100%;
+            autonomous: Editor.assistant-autonomous;
+            logged-in: Editor.assistant-logged-in;
+            user-email: Editor.assistant-user-email;
+            messages: Editor.assistant-messages;
+            busy: Editor.assistant-busy;
+            status: Editor.assistant-status;
+            model-name: Editor.assistant-model;
+
+            close => { Editor.assistant-open = false; }
+            mode-changed(autonomous) => { Editor.assistant-mode-changed(autonomous); }
+            login => { Editor.assistant-login(); }
+            logout => { Editor.assistant-logout(); }
+            send-message(msg) => { Editor.assistant-send-message(msg); }
+            approve-action(id) => { Editor.assistant-approve-action(id); }
+            reject-action(id) => { Editor.assistant-reject-action(id); }
+            clear => { Editor.assistant-clear(); }
+            model-changed(m) => { Editor.assistant-model-changed(m); }
+        }
+    }
+
+    // ── Gemini Floating Bubble (Draggable AI FAB) ──
+    if !root.on-start: bubble := Rectangle {
+        property <bool> has-custom-pos: false;
+        property <length> custom-x: 0px;
+        property <length> custom-y: 0px;
+        property <length> drag-origin-x: 0px;
+        property <length> drag-origin-y: 0px;
+        property <length> bubble-start-x: 0px;
+        property <length> bubble-start-y: 0px;
+        property <bool> is-dragging: false;
+
+        width: root.phone ? 48px : 54px;
+        height: root.phone ? 48px : 54px;
+        x: self.has-custom-pos
+            ? Math.max(8px, Math.min(root.width - self.width - 8px, self.custom-x))
+            : (root.width - self.width - (root.phone ? 14px : 20px));
+        y: self.has-custom-pos
+            ? Math.max(8px + root.safe-area-insets.top, Math.min(root.height - self.height - 8px - root.safe-area-insets.bottom, self.custom-y))
+            : (root.height - (root.phone ? 64px : 70px) - root.safe-area-insets.bottom);
+        border-radius: root.phone ? 24px : 27px;
+        background: Editor.assistant-open ? #ec4899 : (bubble-touch.has-hover ? #7c3aed : #6366f1);
+        border-width: 2px;
+        border-color: bubble-touch.has-hover ? #ffffff : (Editor.assistant-open ? #fbcfe8 : #c084fc);
+        drop-shadow-blur: bubble.is-dragging ? 24px : (bubble-touch.has-hover ? 20px : 14px);
+        drop-shadow-color: bubble.is-dragging ? #a855f7ff : (Editor.assistant-open ? #ec4899aa : #7c3aedcc);
+        drop-shadow-offset-y: bubble.is-dragging ? 6px : 3px;
+
+        // Glossy highlight reflection
+        Rectangle {
+            x: 7px;
+            y: 4px;
+            width: parent.width - 14px;
+            height: 20px;
+            border-radius: 10px;
+            background: #ffffff33;
+        }
+
+        bubble-touch := TouchArea {
+            mouse-cursor: bubble.is-dragging ? MouseCursor.grabbing : (self.has-hover ? MouseCursor.pointer : MouseCursor.default);
+
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    bubble.drag-origin-x = self.absolute-position.x + self.mouse-x;
+                    bubble.drag-origin-y = self.absolute-position.y + self.mouse-y;
+                    bubble.bubble-start-x = bubble.x;
+                    bubble.bubble-start-y = bubble.y;
+                    bubble.is-dragging = false;
+                } else if (event.kind == PointerEventKind.up) {
+                    if (!bubble.is-dragging) {
+                        Editor.assistant-open = !Editor.assistant-open;
+                    }
+                    bubble.is-dragging = false;
+                } else if (event.kind == PointerEventKind.cancel) {
+                    bubble.is-dragging = false;
+                }
+            }
+
+            moved => {
+                if (self.pressed) {
+                    let cur-x = self.absolute-position.x + self.mouse-x;
+                    let cur-y = self.absolute-position.y + self.mouse-y;
+                    let dx = cur-x - bubble.drag-origin-x;
+                    let dy = cur-y - bubble.drag-origin-y;
+                    if (Math.abs(dx) > 4px || Math.abs(dy) > 4px) {
+                        bubble.is-dragging = true;
+                        bubble.has-custom-pos = true;
+                        bubble.custom-x = bubble.bubble-start-x + dx;
+                        bubble.custom-y = bubble.bubble-start-y + dy;
+                    }
+                }
+            }
+
+            Icon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: 24px;
+                glyph: Editor.assistant-open ? Glyph.close : Glyph.sparkle;
+                tint: #ffffff;
+            }
+        }
+
+        // Status indicator orb (busy = yellow, logged-in = green, idle = cyan)
+        Rectangle {
+            x: parent.width - 15px;
+            y: 3px;
+            width: 12px;
+            height: 12px;
+            border-radius: 6px;
+            background: Editor.assistant-busy ? #f59e0b : (Editor.assistant-logged-in ? #10b981 : #38bdf8);
+            border-width: 2px;
+            border-color: #0f172a;
+        }
+
+        // Hover tooltip label
+        if bubble-touch.has-hover && !bubble.is-dragging: Rectangle {
+            x: (bubble.x > 140px) ? -128px : (bubble.width + 10px);
+            y: 13px;
+            width: 118px;
+            height: 28px;
+            border-radius: 14px;
+            background: #0f172ae6;
+            border-width: 1.5px;
+            border-color: #a855f7;
+            drop-shadow-blur: 10px;
+            drop-shadow-color: #000000aa;
+
+            Text {
+                text: Editor.assistant-open ? "Ocultar chat" : "✨ Gemini AI";
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
     }
 
     // Over the workspace and both sheets, under the menus. A tooltip has to

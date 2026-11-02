@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Jareer Abdullah and Concat contributors
+// SPDX-FileCopyrightText: 2026 Jareer and Concat contributors
 
 import { Theme } from "../theme/theme.slint";
 import { Payload } from "../util.slint";
@@ -11,6 +11,8 @@ import { MediaPane, SourcePreview } from "media-pane.slint";
 import { PreviewPane } from "preview-pane.slint";
 import { TimelinePane } from "timeline-pane.slint";
 import { KeyframesPane } from "keyframes-pane.slint";
+import { MetersPane } from "meters-pane.slint";
+import { AssistantPane } from "assistant-pane.slint";
 
 // One box of the workspace, showing whichever view its `kind` names.
 //
@@ -131,8 +133,6 @@ export component Seat inherits Rectangle {
             catalogue-effects: Editor.catalogue-effects;
             catalogue-audio: Editor.catalogue-audio;
             catalogue-filters: Editor.catalogue-filters;
-            catalogue-luts: Editor.catalogue-luts;
-            adjustment-art: Editor.adjustment-art;
             catalogue-transitions: Editor.catalogue-transitions;
             effect-groups: Editor.effect-groups;
             audio-groups: Editor.audio-groups;
@@ -146,10 +146,9 @@ export component Seat inherits Rectangle {
             audition: Editor.library-audition;
             audition-filter(id) => { Editor.library-audition-filter(id); }
             apply-audio(id) => { Editor.library-apply-audio(id); }
+            apply-photo-effect(id) => { Editor.library-apply-photo-effect(id); }
             save-template => { Editor.library-save-template(); }
             import-lut => { Editor.library-import-lut(); }
-            add-adjustment(label) => { Editor.library-add-adjustment(label); }
-            apply-lut(id, label) => { Editor.library-apply-lut(id, label); }
             reload-packages => { Editor.library-reload-packages(); }
         }
 
@@ -164,8 +163,6 @@ export component Seat inherits Rectangle {
             pane-removable: Editor.seats.length > 1;
             pane-removed => { root.removed(); }
 
-            previewing: Editor.library-audition != "";
-            preview-ended => { Editor.library-audition-filter(Editor.library-audition); }
             output-width: Editor.output-width;
             output-height: Editor.output-height;
             frame-rate: Editor.frame-rate;
@@ -181,7 +178,6 @@ export component Seat inherits Rectangle {
             has-picture: Editor.has-picture;
             clip-name: Editor.preview-clip-name;
             frame: Editor.preview-frame;
-            see-through: Editor.see-through && !SourcePreview.open;
             stage-items: SourcePreview.open ? [] : Editor.stage-items;
             stage-guides: Editor.stage-guides;
             stroke-path: Editor.stroke-path;
@@ -264,6 +260,9 @@ export component Seat inherits Rectangle {
             chain-toggle(audio, index) => { Editor.chain-toggle(audio, index); }
             chain-move-by(audio, index, delta) => { Editor.chain-move-by(audio, index, delta); }
             chain-remove(audio, index) => { Editor.chain-remove(audio, index); }
+            open-face-zoom => { Editor.open-face-zoom(""); }
+            open-ai-expand => { Editor.open-ai-expand(""); }
+            restore-ai-expand => { Editor.restore-ai-expand(""); }
             chain-set-param(audio, index, key, value) => {
                 Editor.chain-set-param(audio, index, key, value);
             }
@@ -277,13 +276,8 @@ export component Seat inherits Rectangle {
             cutout-subject(index) => { Editor.cutout-subject(index); }
             cutout-clear => { Editor.cutout-clear(); }
             clip-enhance-set(on) => { Editor.clip-enhance-set(on); }
-            clip-enhance-size(index) => { Editor.clip-enhance-size(index); }
-            clip-enhance-strength(strength) => { Editor.clip-enhance-strength(strength); }
-            clip-enhance-preview => { Editor.clip-enhance-preview(); }
-            clip-enhance-run => { Editor.clip-enhance-run(); }
             transition-remove => { Editor.transition-remove(); }
             transition-duration-set(seconds) => { Editor.transition-duration-set(seconds); }
-            transition-param-set(key, value) => { Editor.transition-param-set(key, value); }
 
             project-name: Editor.project-name;
             project-folder: Editor.project-folder;
@@ -298,13 +292,8 @@ export component Seat inherits Rectangle {
 
             selected: Editor.selected-clip;
             transition: Editor.selected-transition;
-            transition-knobs: Editor.transition-knobs;
-            transition-choices: Editor.transition-choices;
             clip-set(field, value) => { Editor.clip-set(field, value); }
             clip-set-text(field, value) => { Editor.clip-set-text(field, value); }
-            clip-set-words(text, caret) => { Editor.clip-set-words(text, caret); }
-            clip-select-words(anchor, cursor) => { Editor.clip-select-words(anchor, cursor); }
-            clip-reset-words => { Editor.clip-reset-words(); }
             clip-set-colour(field, value) => { Editor.clip-set-colour(field, value); }
             clip-commit => { Editor.clip-commit(); }
             font-families: Editor.font-families;
@@ -347,6 +336,45 @@ export component Seat inherits Rectangle {
         }
     }
 
+    if root.kind == PaneKind.meters: MetersPane {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+
+            pane-picked(kind) => { root.picked(kind); }
+            pane-seat: root.index;
+            pane-removable: Editor.seats.length > 1;
+            pane-removed => { root.removed(); }
+    }
+
+    if root.kind == PaneKind.assistant: AssistantPane {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+
+            pane-picked(kind) => { root.picked(kind); }
+            pane-seat: root.index;
+            pane-removable: Editor.seats.length > 1;
+            pane-removed => { root.removed(); }
+
+            autonomous: Editor.assistant-autonomous;
+            logged-in: Editor.assistant-logged-in;
+            user-email: Editor.assistant-user-email;
+            messages: Editor.assistant-messages;
+            busy: Editor.assistant-busy;
+            status: Editor.assistant-status;
+
+            mode-changed(autonomous) => { Editor.assistant-mode-changed(autonomous); }
+            login => { Editor.assistant-login(); }
+            logout => { Editor.assistant-logout(); }
+            send-message(msg) => { Editor.assistant-send-message(msg); }
+            approve-action(id) => { Editor.assistant-approve-action(id); }
+            reject-action(id) => { Editor.assistant-reject-action(id); }
+    }
+
+
     if root.kind == PaneKind.keyframes: KeyframesPane {
             x: 0;
             y: 0;
@@ -383,10 +411,8 @@ export component Seat inherits Rectangle {
             tool: Editor.tool;
             snap: Editor.snap;
             magnetic: Editor.magnetic;
-            linkage: Editor.linkage;
             pan-mode: Editor.pan-mode;
             trim-follow: Editor.trim-follow;
-            meters-shown: Editor.meters-shown;
             preview-axis: Editor.preview-axis;
             preview-axis-audio: Editor.preview-axis-audio;
             selected-count: Editor.selected-count;
@@ -416,10 +442,8 @@ export component Seat inherits Rectangle {
             tool-changed(tool) => { Editor.tool-changed(tool); }
             snap-changed(snap) => { Editor.snap-changed(snap); }
             magnetic-changed(on) => { Editor.magnetic-changed(on); }
-            linkage-changed(on) => { Editor.linkage-changed(on); }
             pan-changed(on) => { Editor.pan-changed(on); }
             trim-follow-changed(on) => { Editor.trim-follow-changed(on); }
-            meters-shown-changed(on) => { Editor.meters-shown-changed(on); }
             preview-axis-changed(on) => { Editor.preview-axis-changed(on); }
             preview-axis-audio-changed(on) => { Editor.preview-axis-audio-changed(on); }
             clip-verb(action) => { Editor.shortcut(action); }
@@ -439,7 +463,6 @@ export component Seat inherits Rectangle {
             lanes-resized(width) => { Editor.lanes-resized(width); }
             floor-pressed => { Editor.blur(); }
             key-mark-moved(from, to) => { Editor.key-mark-moved(from, to); }
-            key-mark-opened => { Editor.key-mark-opened(); }
             scrubbed(seconds) => {
                 Editor.blur();
                 Editor.scrubbed(seconds);
