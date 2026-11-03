@@ -75,7 +75,9 @@ pub enum AiExpandMsg {
     Generate,
     /// Background AI generation completed.
     GenerationDone {
+        #[allow(dead_code)]
         clip_id: String,
+        #[allow(dead_code)]
         original_media_id: String,
         result: Result<PathBuf, String>,
         cached_bg: Option<Vec<u8>>,

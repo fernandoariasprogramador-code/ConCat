@@ -5,8 +5,17 @@
 //! the build for Settings > About.
 
 fn main() {
-    println!("cargo:rustc-link-search=native=d:/CONCAT Video/Concat-main");
-    println!("cargo:rustc-link-lib=static=stl_compat");
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_os == "windows" && target_env == "msvc" {
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let root_dir = std::path::PathBuf::from(manifest_dir).join("../../..");
+            if root_dir.join("stl_compat.lib").exists() {
+                println!("cargo:rustc-link-search=native={}", root_dir.display());
+                println!("cargo:rustc-link-lib=static=stl_compat");
+            }
+        }
+    }
     // Fonts and images are compiled into the binary rather than read off disk
     // at run time.
     //
