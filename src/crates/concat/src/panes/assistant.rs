@@ -172,7 +172,7 @@ impl AssistantController {
                 };
 
                 // Open browser
-                if let Err(err) = opener::open_browser(&flow.auth_url) {
+                if let Err(err) = crate::platform::open_browser(&flow.auth_url) {
                     studio.notify(&format!("No se pudo abrir el navegador: {err}"), true);
                     return;
                 }

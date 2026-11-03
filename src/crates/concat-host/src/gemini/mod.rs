@@ -6,6 +6,8 @@
 //! Provides Google OAuth 2.0 PKCE authentication, Gemini Generative Language API
 //! client with Function Calling, project tool execution, and an intelligent editing agent.
 
+#![allow(missing_docs)]
+
 pub mod agent;
 pub mod client;
 pub mod oauth;

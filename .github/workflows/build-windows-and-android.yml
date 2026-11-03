@@ -37,7 +37,7 @@ jobs:
   android:
     name: Android APK (arm64)
     if: github.event_name != 'workflow_dispatch' || inputs.build_android
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

@@ -799,6 +799,19 @@ pub fn reveal(path: &str) -> Result<(), String> {
     }
 }
 
+/// Opens a URL in the platform's default web browser.
+pub fn open_browser(url: &str) -> Result<(), String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        opener::open_browser(url).map_err(|error| error.to_string())
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        Err(format!("Opening browser is not supported directly on this platform. Please visit: {url}"))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

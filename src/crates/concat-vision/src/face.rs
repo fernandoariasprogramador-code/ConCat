@@ -18,6 +18,7 @@ const INPUT_WIDTH: u32 = 320;
 const INPUT_HEIGHT: u32 = 240;
 
 /// A detected face with normalized coordinates [0..1].
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DetectedFace {
     pub id: usize,
