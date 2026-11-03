@@ -4,16 +4,18 @@
 
 <h1 align="center">Concat</h1>
 <h3 align="center">The free, open-source, cross-platform CapCut replacement.</h3>
+<h4 align="center">✨ Enhanced Edition with Google Gemini AI Assistant, Smart Face Tracking & Multiplatform CI/CD ✨</h4>
+
+> [!NOTE]
+> **Enhanced Edition / Versión Mejorada**: This repository is an enhanced fork of the original [Concat project created by Jareer (jub0t)](https://github.com/jub0t/Concat). It introduces an interactive **Google Gemini AI Assistant** (supporting OAuth 2.0 and BYOK API Keys), **Neural Face-Tracking Ken Burns Zoom**, **AI Outpainting / Scene Expansion**, and automated CI/CD builds for Windows and Android — all while strictly preserving the original **GNU AGPLv3** open-source license.
 
 <div align="center">
 
 <img src="https://cdn.jsdelivr.net/gh/jub0t/Concat@main/assets/editor.png" alt="Concat editor" width="100%" />
 
 <p align="center">
-  <a href="https://github.com/jub0t/Concat/releases"><img src="https://img.shields.io/github/downloads/jub0t/concat/total?style=flat&logo=github&logoColor=F8F8F8&label=Downloads&labelColor=212123&color=0568FD" alt="Total Downloads" /></a>
-  <a href="https://github.com/jub0t/Concat/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/jub0t/Concat/ci.yml?style=flat&logo=githubactions&logoColor=F8F8F8&label=Build&labelColor=000000" alt="Build Status" /></a>
-  <a href="https://github.com/jub0t/Concat/releases"><img src="https://img.shields.io/badge/Version-0.2.7-0568FD?style=flat&logo=semver&logoColor=F8F8F8&labelColor=212123" alt="Concat Version 0.2.7" /></a>
-  <a href="https://discord.gg/DVuPfpXfqP"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=flat&logo=discord&logoColor=F8F8F8&labelColor=000000" alt="Join Concat Discord" /></a>
+  <a href="https://github.com/fernandoariasprogramador-code/ConCat/actions/workflows/build-windows-and-android.yml"><img src="https://github.com/fernandoariasprogramador-code/ConCat/actions/workflows/build-windows-and-android.yml/badge.svg" alt="Build Status" /></a>
+  <a href="https://github.com/fernandoariasprogramador-code/ConCat/actions"><img src="https://img.shields.io/badge/Windows%20%26%20Android-Builds%20Available-success?style=flat&logo=android&logoColor=F8F8F8&labelColor=212123" alt="Automated Builds" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-0568FD?style=flat&logo=gnu&logoColor=F8F8F8&labelColor=212123" alt="License: AGPL-3.0-or-later" /></a>
 </p>
 
@@ -66,6 +68,29 @@ Everything runs locally on a native Rust engine with a GPU compositor. Install i
 - 🦀 **Native Rust engine.** GPU compositor, proxies, hardware decode. 4K scrubs smoothly.
 - 🤖 **Scriptable.** A JSON-RPC API that scripts and AI agents can cut video with. A build from source adds gRPC and a command-line tool.
 - 🖥️ **macOS, Windows, Linux, Android.** 25 languages. Same app, same project files.
+
+## 🚀 What's New in this Enhanced Edition
+
+This edition introduces powerful generative AI tools, computer vision tracking, and automated cloud workflows:
+
+### 🤖 1. Google Gemini AI Video Assistant
+- **Natural Language Video Control**: Ask the AI assistant to find silences, split clips, apply transitions, reorder footage, or adjust audio levels using integrated Function Calling tools.
+- **Support for Latest Models**: Seamlessly choose between `gemini-2.5-flash`, `gemini-2.5-pro`, and preview models.
+- **Bring Your Own Key (BYOK) & Privacy**: Users can connect via secure **Google OAuth 2.0 PKCE** or paste their own Google AI Studio API key (`/key AIza...`). Each user consumes only their own free quota or subscription without server tokens or shared limits.
+- **Interactive UI**: Includes a draggable floating AI bubble and a dedicated dockable assistant panel with *Copilot Mode* (confirmation before actions) and *Autonomous Mode*.
+
+### 👤 2. Smart Ken Burns Effect with Face Detection
+- **Local Neural Face Tracking**: Embedded ultra-fast ONNX neural network (UltraFace) detects human faces directly on your CPU/GPU without uploading any frames.
+- **Cinematic Framing**: Automatically calculates the center of subjects and creates a smooth, progressive Ken Burns pan-and-zoom effect centered on the face.
+- **Customizable**: Adjust zoom intensity, pan curve, and animation duration.
+
+### 🖼️ 3. AI Scene Expansion & Outpainting
+- **Aspect Ratio Adaptation**: Intelligently transform vertical (9:16) smartphone clips and photos into widescreen (16:9) formats.
+- **Multiple Fill Modes**: Generative AI background infill, mirror reflection, or feathered bokeh blur.
+
+### 📦 4. Automated Cloud CI/CD (Windows & Android APK)
+- **One-Click Automated Builds**: Fully configured GitHub Actions workflow (`build-windows-and-android.yml`).
+- **Precompiled Artifacts**: Automatically compiles the `aarch64-linux-android` APK installer and the Windows x86_64 setup installer and portable zip package under the [Actions tab](https://github.com/fernandoariasprogramador-code/ConCat/actions).
 
 ## Download
 
@@ -136,6 +161,15 @@ If you change text the interface shows, run `python3 scripts/locales.py` from th
   <img alt="Contributors" src="https://contrib.rocks/image?repo=jub0t/concat">
 </a>
 
+## 📄 License & Attribution
+
+This project is free software licensed under the **GNU Affero General Public License Version 3 (AGPL-3.0-or-later)** — the exact same open-source copyleft license as the original software. You are free to inspect, modify, run, and distribute this software under the terms of the AGPLv3.
+
+- **Original Project & Creator:** [Concat by Jareer (jub0t)](https://github.com/jub0t/Concat).
+- **Modifications & Enhancements:** Concat Enhanced Edition maintained by [Fernando Arias](https://github.com/fernandoariasprogramador-code/ConCat).
+- **Full License Text:** See the [LICENSE](LICENSE) file.
+
 ## DMCA
 
 If you believe something in this repository, its releases, or a package or model it distributes infringes your copyright, email [jub0trd@gmail.com](mailto:jub0trd@gmail.com) with a description of the work you own, a link to where the infringing material appears here, your contact details, a statement that you believe in good faith the use is not authorised by you, your agent, or the law, and a statement, under penalty of perjury, that the notice is accurate and that you are the owner or authorised to act for the owner, signed with your physical or electronic signature; valid notices are acted on promptly, and anyone whose material is removed may send a counter-notice to the same address.
+
