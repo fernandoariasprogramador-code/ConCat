@@ -1,0 +1,246 @@
+name: Build Concat (Windows & Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_windows:
+        description: "Compilar instalador para Windows (x86_64)"
+        required: true
+        type: boolean
+        default: true
+      build_android:
+        description: "Compilar APK para Android (arm64)"
+        required: true
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "audit/**"
+      - "scripts/readme/**"
+
+env:
+  CARGO_TERM_COLOR: always
+  GGML_NATIVE: "OFF"
+  GGML_AVX2: "OFF"
+  GGML_FMA: "OFF"
+  GGML_F16C: "OFF"
+  GGML_BMI2: "OFF"
+  ORT_VERSION: "1.28.0"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ANDROID BUILD (APK ARM64)
+  # ─────────────────────────────────────────────────────────────────────────────
+  android:
+    name: Android APK (arm64)
+    if: github.event_name != 'workflow_dispatch' || inputs.build_android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Obtener versión
+        id: version
+        run: |
+          ver=$(sed -n 's/^version = "\(.*\)"/\1/p' src/Cargo.toml | head -1)
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "Compilando Concat $ver para Android arm64"
+
+      - name: Instalar Rust
+        id: toolchain
+        run: echo "channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' src/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: aarch64-linux-android
+
+      - uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: cargo-apk
+
+      - name: Dependencias del sistema
+        run: sudo apt-get update && sudo apt-get install -y cmake libclang-dev
+
+      - name: Cache FFmpeg móvil
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: src/vendor/ffmpeg/aarch64-linux-android
+          key: ffmpeg-android-aarch64-${{ hashFiles('src/scripts/ffmpeg-mobile.sh') }}
+
+      - name: Compilar FFmpeg móvil
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: src/scripts/ffmpeg-mobile.sh aarch64-linux-android
+
+      - name: Descargar sherpa-onnx para Android
+        run: src/scripts/sherpa-mobile.sh aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src
+          key: aarch64-linux-android
+
+      - name: Generar Keystore para el APK
+        run: |
+          set -euo pipefail
+          keystore=$RUNNER_TEMP/run.keystore
+          keytool -genkeypair -v -keystore "$keystore" -storepass concat -keypass concat \
+            -alias concat -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Concat, O=Concat" >/dev/null 2>&1
+          echo "CARGO_APK_RELEASE_KEYSTORE=$keystore" >> "$GITHUB_ENV"
+          echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=concat" >> "$GITHUB_ENV"
+
+      - name: Compilar APK con Cargo
+        working-directory: src
+        run: |
+          set -o pipefail
+          eval "$(scripts/mobile-env.sh aarch64-linux-android)"
+          cargo apk build --release -p concat-android --target aarch64-linux-android
+
+      - name: Preparar artefacto APK
+        run: |
+          mkdir -p stage-android
+          ver="${{ steps.version.outputs.version }}"
+          cp src/target/release/apk/Concat.apk "stage-android/Concat-$ver-android-arm64.apk"
+          ls -lh stage-android
+
+      - name: Subir Instalador APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Concat-android-arm64-apk
+          path: stage-android/*
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WINDOWS BUILD (SETUP.EXE & PORTABLE ZIP)
+  # ─────────────────────────────────────────────────────────────────────────────
+  windows:
+    name: Windows x86_64
+    if: github.event_name != 'workflow_dispatch' || inputs.build_windows
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Obtener versión
+        id: version
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path src\Cargo.toml -Pattern '^version = "(.*)"').Matches.Groups[1].Value
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Compilando Concat $ver para Windows x86_64"
+
+      - name: Instalar Rust
+        shell: pwsh
+        run: |
+          $channel = (Select-String -Path src\rust-toolchain.toml -Pattern '^channel = "(.*)"').Matches.Groups[1].Value
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.channel }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Descargar LLVM
+        shell: pwsh
+        run: |
+          $bash = "$env:ProgramFiles\Git\bin\bash.exe"
+          & $bash scripts/ci/fetch.sh llvm-win64 llvm.7z
+          7z x llvm.7z -ollvm | Out-Null
+          "LIBCLANG_PATH=$PWD\llvm\bin" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$PWD\llvm\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Descargar FFmpeg compartido (BtbN)
+        shell: pwsh
+        run: |
+          $bash = "$env:ProgramFiles\Git\bin\bash.exe"
+          & $bash scripts/ci/fetch.sh ffmpeg-win64 ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath .
+          $dir = (Get-ChildItem ffmpeg-* -Directory | Select-Object -First 1).FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Descargar ONNX Runtime
+        shell: pwsh
+        run: |
+          $bash = "$env:ProgramFiles\Git\bin\bash.exe"
+          & $bash scripts/ci/fetch.sh onnxruntime-win-x64 onnxruntime.zip
+          Expand-Archive onnxruntime.zip -DestinationPath .
+          $dir = "$PWD\onnxruntime-win-x64-$env:ORT_VERSION"
+          "ORT_LIB_LOCATION=$dir\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ORT_PREFER_DYNAMIC_LINK=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ORT_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\lib" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Descargar sherpa-onnx
+        shell: pwsh
+        run: |
+          $bash = "$env:ProgramFiles\Git\bin\bash.exe"
+          & $bash scripts/ci/fetch.sh sherpa-onnx-win-x64-shared-MT-Release-lib sherpa.tar.bz2
+          python -c "import tarfile; t = tarfile.open('sherpa.tar.bz2'); t.extractall()"
+          $stem = "sherpa-onnx-v1.13.7-win-x64-shared-MT-Release-lib"
+          New-Item -ItemType Directory -Force sherpa-libs, sherpa-dlls | Out-Null
+          Copy-Item "$stem\lib\sherpa-onnx-*.lib" sherpa-libs\
+          Copy-Item "$stem\lib\sherpa-onnx-*.dll" sherpa-dlls\
+          "SHERPA_ONNX_LIB_DIR=$PWD\sherpa-libs" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SHERPA_DLL_DIR=$PWD\sherpa-dlls" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src
+          key: x86_64-pc-windows-msvc
+
+      - name: Compilar binario de Windows (Cargo app)
+        shell: pwsh
+        run: |
+          Set-Location src
+          cargo build --profile app -p concat --target x86_64-pc-windows-msvc
+
+      - name: Empaquetar artefactos de Windows
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $name = "Concat-$ver-windows-x86_64"
+          $dir = "stage-win\$name"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          
+          # Copiar ejecutable principal
+          Copy-Item "src\target\x86_64-pc-windows-msvc\app\concat.exe" $dir\
+          
+          # Copiar librerías DLL necesarias
+          Copy-Item "$env:FFMPEG_DIR\bin\*.dll" $dir\
+          Copy-Item "$env:SHERPA_DLL_DIR\*.dll" $dir\
+          Copy-Item "$env:ORT_DIR\lib\*.dll" $dir\
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md $dir\
+          
+          # Copiar Visual C++ Runtime si está disponible
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
+          $crt = Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC14*.CRT" -Directory -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if ($crt) { Copy-Item "$($crt.FullName)\*.dll" $dir\ -Force }
+          
+          # Crear versión Portable .zip
+          Compress-Archive -Path "$dir\*" -DestinationPath "stage-win\$name-portable.zip"
+          
+          # Compilar instalador con Inno Setup
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y | Out-Null
+          }
+          if (Test-Path $iscc) {
+            & $iscc "/DVersion=$ver" "/DArch=x64compatible" "/DSuffix=x86_64" "/DStage=$PWD\$dir" "/DOut=$PWD\stage-win" assets\windows\concat.iss
+          }
+
+          # Remover carpeta descomprimida para dejar solo el zip y el instalador
+          Remove-Item -Recurse -Force $dir
+          Get-ChildItem stage-win | Format-Table Name, Length
+
+      - name: Subir Instalador y Portable de Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Concat-windows-x86_64
+          path: stage-win/*
+          if-no-files-found: error
