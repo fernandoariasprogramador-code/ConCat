@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Obtener versión
         id: version
@@ -58,7 +58,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           targets: aarch64-linux-android
 
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-apk
 
@@ -67,7 +67,7 @@ jobs:
 
       - name: Cache FFmpeg móvil
         id: ffmpeg-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: src/vendor/ffmpeg/aarch64-linux-android
           key: ffmpeg-android-aarch64-${{ hashFiles('src/scripts/ffmpeg-mobile.sh') }}
@@ -109,7 +109,7 @@ jobs:
           ls -lh stage-android
 
       - name: Subir Instalador APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Concat-android-arm64-apk
           path: stage-android/*
@@ -124,7 +124,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Obtener versión
         id: version
@@ -239,7 +239,7 @@ jobs:
           Get-ChildItem stage-win | Format-Table Name, Length
 
       - name: Subir Instalador y Portable de Windows
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Concat-windows-x86_64
           path: stage-win/*
